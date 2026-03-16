@@ -1,0 +1,75 @@
+[project]
+name = "agentic-ml-backend"
+version = "0.1.0"
+description = "Backend for Agentic ML Engineer Platform"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Web framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+
+    # Data validation
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+
+    # Database
+    "sqlalchemy>=2.0.25",
+    "psycopg2-binary>=2.9.9",
+    "alembic>=1.13.1",
+
+    # Task queue
+    "celery>=5.3.6",
+    "redis>=5.0.1",
+
+    # Data processing
+    "pandas>=2.1.4",
+    "numpy>=1.26.3",
+
+    # AutoML (placeholder - will configure specific version later)
+    # "autogluon.tabular>=1.0.0",
+
+    # HTTP client for LLM API calls
+    "httpx>=0.26.0",
+
+    # Utilities
+    "python-multipart>=0.0.6",
+    "python-dotenv>=1.0.0",
+
+    # Web scraping for dataset discovery
+    "selenium>=4.15.0",
+    "webdriver-manager>=4.0.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.3",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "black>=24.1.0",
+    "ruff>=0.1.14",
+    "mypy>=1.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=69.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
