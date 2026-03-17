@@ -1209,6 +1209,24 @@ export async function removeProjectShare(projectId: string, shareId: string): Pr
   }, true);
 }
 
+// Sharing - Datasets
+export async function listDatasetShares(datasetId: string): Promise<ShareListResponse> {
+  return apiFetch<ShareListResponse>(`/api/v1/sharing/datasets/${datasetId}/shares`, {}, true);
+}
+
+export async function shareDataset(datasetId: string, data: ShareRequest): Promise<Share> {
+  return apiFetch<Share>(`/api/v1/sharing/datasets/${datasetId}/shares`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, true);
+}
+
+export async function removeDatasetShare(datasetId: string, shareId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/sharing/datasets/${datasetId}/shares/${shareId}`, {
+    method: 'DELETE',
+  }, true);
+}
+
 // ============================================
 // Sharing - Accept Invitations
 // ============================================

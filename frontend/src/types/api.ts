@@ -285,6 +285,9 @@ export interface ValidationStrategy {
 export interface ExperimentPlan {
   automl_config?: AutoMLConfig;
   validation_strategy?: ValidationStrategy;
+  feature_engineering_warnings?: string[];
+  feature_engineering_failure_count?: number;
+  feature_engineering_success_count?: number;
 }
 
 export interface AutoMLConfig {

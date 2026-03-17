@@ -310,12 +310,13 @@ export default function ContextDocuments({ projectId, onClose }: ContextDocument
       {/* Delete Confirmation */}
       {deleteDoc && (
         <ConfirmDialog
+          isOpen={true}
           title="Delete Context Document"
           message={`Are you sure you want to delete "${deleteDoc.name}"? This cannot be undone.`}
           confirmLabel="Delete"
-          confirmVariant="error"
+          variant="danger"
           onConfirm={() => handleDelete(deleteDoc)}
-          onCancel={() => setDeleteDoc(null)}
+          onClose={() => setDeleteDoc(null)}
         />
       )}
     </div>

@@ -323,7 +323,7 @@ export default function AgentStepDrawer({
         )}
 
         {/* Summary Section */}
-        {summaryText && summaryText.length > 0 && (
+        {summaryText != null && summaryText.length > 0 && (
           <div className="drawer-summary">
             <h4>{isDebateStep ? 'Full Message' : 'Summary'}</h4>
             <p style={{ whiteSpace: 'pre-wrap' }}>{summaryText}</p>
@@ -339,7 +339,7 @@ export default function AgentStepDrawer({
         )}
 
         {/* Leakage Candidates Section (Prompt 6) - for data_audit step */}
-        {step.step_type === 'data_audit' && step.status === 'completed' && step.output_json?.leakage_candidates && (
+        {step.step_type === 'data_audit' && step.status === 'completed' && !!step.output_json?.leakage_candidates && (
           (() => {
             const candidates = step.output_json.leakage_candidates as Array<{
               column: string;
