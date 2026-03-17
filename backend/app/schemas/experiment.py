@@ -11,7 +11,6 @@ from app.models.experiment import ExperimentStatus, MetricDirection, TrialStatus
 
 class TrainingBackend(str, Enum):
     """Training backend options."""
-    LOCAL = "local"  # Run on local Celery worker
     MODAL = "modal"  # Run on Modal.com cloud
 
 
@@ -19,23 +18,7 @@ class TrainingOptions(BaseModel):
     """Options for how to run training."""
     backend: TrainingBackend = Field(
         default=TrainingBackend.MODAL,
-        description="Where to run training: 'local' (Celery) or 'modal' (cloud)"
-    )
-    resource_limits_enabled: bool = Field(
-        default=True,
-        description="Enable CPU/memory limits for local training (recommended to prevent freezes)"
-    )
-    num_cpus: Optional[int] = Field(
-        default=None,
-        description="Number of CPU cores to use (None = use config default)"
-    )
-    num_gpus: Optional[int] = Field(
-        default=None,
-        description="Number of GPUs to use (None = use config default)"
-    )
-    memory_limit_gb: Optional[int] = Field(
-        default=None,
-        description="Memory limit in GB (None = use config default)"
+        description="Training runs on Modal.com cloud"
     )
 
 

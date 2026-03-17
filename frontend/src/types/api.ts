@@ -320,14 +320,10 @@ export interface ExperimentUpdate {
 }
 
 // Training options
-export type TrainingBackend = 'local' | 'modal';
+export type TrainingBackend = 'modal';
 
 export interface TrainingOptions {
   backend?: TrainingBackend;
-  resource_limits_enabled?: boolean;
-  num_cpus?: number | null;
-  num_gpus?: number | null;
-  memory_limit_gb?: number | null;
 }
 
 export interface ExperimentRunRequest {
@@ -344,10 +340,6 @@ export interface ExperimentRunResponse {
 
 export interface TrainingOptionsInfo {
   backends: {
-    local: {
-      available: boolean;
-      description: string;
-    };
     modal: {
       available: boolean;
       description: string;
@@ -358,15 +350,6 @@ export interface TrainingOptionsInfo {
         token_set: boolean;
       };
     };
-  };
-  resource_limits: {
-    enabled_by_default: boolean;
-    defaults: {
-      num_cpus: number;
-      num_gpus: number;
-      memory_limit_gb: number;
-    };
-    description: string;
   };
   automl_defaults: {
     time_limit: number;

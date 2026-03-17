@@ -858,68 +858,34 @@ def run_experiment(
             detail="Experiment has no dataset_spec_id configured",
         )
 
-    # Get training options (use defaults if not provided)
-    training_options = request.training_options if request else None
-    if training_options is None:
-        training_options = TrainingOptions()
-
     # Reset experiment status immediately so UI shows correct state
     experiment.status = ExperimentStatus.PENDING
     experiment.error_message = None  # Clear any previous error
     db.commit()
 
-    # Handle Modal backend
-    if training_options.backend == TrainingBackend.MODAL:
-        from app.services.modal_runner import is_modal_configured, get_modal_status
+    # All training runs on Modal cloud
+    from app.services.modal_runner import is_modal_configured, get_modal_status
 
-        if not is_modal_configured():
-            status_info = get_modal_status()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Modal is not configured. Status: {status_info}. "
-                f"Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in .env",
-            )
-
-        # Queue the Modal training task via Celery
-        task = run_experiment_modal.delay(str(experiment_id))
-
-        # Store the celery task ID for tracking and cancellation
-        experiment.celery_task_id = task.id
-        db.commit()
-
-        return ExperimentRunResponse(
-            experiment_id=experiment_id,
-            status="queued",
-            task_id=task.id,
-            message=f"Experiment queued for Modal cloud execution. Task ID: {task.id}",
-            backend="modal",
+    if not is_modal_configured():
+        status_info = get_modal_status()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Modal is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in environment variables. Status: {status_info}",
         )
 
-    # Queue the local experiment task with resource options
-    task = run_automl_experiment_task.delay(
-        str(experiment_id),
-        resource_limits_enabled=training_options.resource_limits_enabled,
-        num_cpus=training_options.num_cpus,
-        num_gpus=training_options.num_gpus,
-        memory_limit_gb=training_options.memory_limit_gb,
-    )
+    # Queue the Modal training task via Celery
+    task = run_experiment_modal.delay(str(experiment_id))
 
     # Store the celery task ID for tracking and cancellation
     experiment.celery_task_id = task.id
     db.commit()
 
-    limits_msg = ""
-    if training_options.resource_limits_enabled:
-        limits_msg = " with resource limits"
-    else:
-        limits_msg = " without resource limits (full power)"
-
     return ExperimentRunResponse(
         experiment_id=experiment_id,
         status="queued",
         task_id=task.id,
-        message=f"Experiment queued for local execution{limits_msg}. Task ID: {task.id}",
-        backend="local",
+        message=f"Experiment queued for Modal cloud training. Task ID: {task.id}",
+        backend="modal",
     )
 
 
@@ -940,24 +906,11 @@ def get_training_options(current_user: Optional[User] = Depends(get_current_user
 
     return {
         "backends": {
-            "local": {
-                "available": True,
-                "description": "Run on local Celery worker",
-            },
             "modal": {
                 "available": modal_status["configured"],
-                "description": "Run on Modal.com cloud (faster, no limits)",
+                "description": "Training runs on Modal.com cloud",
                 "status": modal_status,
             },
-        },
-        "resource_limits": {
-            "enabled_by_default": settings.resource_limits_enabled,
-            "defaults": {
-                "num_cpus": settings.autogluon_num_cpus,
-                "num_gpus": settings.autogluon_num_gpus,
-                "memory_limit_gb": settings.max_memory_gb,
-            },
-            "description": "Resource limits help prevent system freezes during training",
         },
         "automl_defaults": {
             "time_limit": settings.automl_time_limit,
