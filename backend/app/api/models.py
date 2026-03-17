@@ -1504,6 +1504,8 @@ def get_remote_model_status(
     2. Whether the model exists on the Modal Volume
     3. Whether local prediction is available
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import os
 
     # Get model
@@ -1557,12 +1559,15 @@ def predict_remote(
     model_id: UUID,
     request: RemotePredictionRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Make predictions using a model stored on Modal Volume.
 
     Use this endpoint when the model is too large to download locally.
     The prediction runs on Modal cloud infrastructure.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import json
 
     # Get model
@@ -1651,6 +1656,7 @@ def predict_auto(
     model_id: UUID,
     request: PredictionRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Make predictions using either local or remote model automatically.
 
@@ -1660,6 +1666,8 @@ def predict_auto(
 
     Use this as the default prediction endpoint - it handles both cases.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import os
     import json
 
