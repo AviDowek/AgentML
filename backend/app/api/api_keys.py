@@ -17,7 +17,10 @@ router = APIRouter(prefix="/api/v1/api-keys", tags=["API Keys"])
 
 
 @router.get("/status", response_model=ApiKeyStatusResponse)
-def get_key_status(db: Session = Depends(get_db)):
+def get_key_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
     """Check which LLM providers have API keys configured."""
     return api_key_service.get_api_key_status(db)
 
@@ -88,7 +91,7 @@ settings_router = APIRouter(prefix="/api/v1/settings", tags=["Settings"])
 
 
 @settings_router.get("/ai-models", response_model=list[AIModelOption])
-def get_available_ai_models():
+def get_available_ai_models(user: User = Depends(get_current_user_required)):
     """Get list of available AI models."""
     return [
         AIModelOption(
@@ -101,7 +104,10 @@ def get_available_ai_models():
 
 
 @settings_router.get("", response_model=AppSettingsResponse)
-def get_app_settings(db: Session = Depends(get_db)):
+def get_app_settings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
     """Get current app settings."""
     settings = db.query(AppSettings).first()
     if not settings:
@@ -123,6 +129,7 @@ def get_app_settings(db: Session = Depends(get_db)):
 def update_app_settings(
     data: AppSettingsUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
 ):
     """Update app settings."""
     settings = db.query(AppSettings).first()
