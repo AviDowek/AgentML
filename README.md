@@ -140,6 +140,7 @@ All configuration is via environment variables. See [`backend/.env.example`](bac
 | `LLM_API_BASE_URL` | No | LLM API endpoint (defaults to OpenAI) |
 | `MODAL_TOKEN_ID` | No | Modal.com token for cloud training |
 | `MODAL_TOKEN_SECRET` | No | Modal.com secret for cloud training |
+| `API_KEY_ENCRYPTION_KEY` | Recommended | Fernet key for encrypting stored API keys |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `SMTP_HOST` | No | SMTP server for email notifications |
 
@@ -180,6 +181,69 @@ AgentML/
 ├── AGENTS.md
 └── README.md
 ```
+
+## Deploying to Production
+
+### Railway (Recommended)
+
+Railway handles PostgreSQL, Redis, HTTPS, and auto-deploy from GitHub.
+
+1. **Create a Railway project** at [railway.app](https://railway.app)
+
+2. **Add services** from the Railway dashboard:
+   - **PostgreSQL** — add from the "New" menu (plugin)
+   - **Redis** — add from the "New" menu (plugin)
+   - **Backend** — "New" > "GitHub Repo" > select `AgentML`, set root directory to `backend`
+   - **Celery Worker** — "New" > "GitHub Repo" > select `AgentML`, set root directory to `backend`, override start command:
+     ```
+     celery -A app.core.celery_app worker --loglevel=info --concurrency=4 -Q celery
+     ```
+   - **Frontend** — "New" > "GitHub Repo" > select `AgentML`, set root directory to `frontend`
+
+3. **Set environment variables** on the Backend service:
+   ```
+   DATABASE_URL        → ${{Postgres.DATABASE_URL}}  (Railway provides this)
+   REDIS_URL           → ${{Redis.REDIS_URL}}        (Railway provides this)
+   CELERY_BROKER_URL   → ${{Redis.REDIS_URL}}
+   CELERY_RESULT_BACKEND → ${{Redis.REDIS_URL}}
+   SECRET_KEY          → (generate: python -c "import secrets; print(secrets.token_urlsafe(32))")
+   LLM_API_KEY         → (your OpenAI key)
+   CORS_ORIGINS        → ["https://your-frontend.up.railway.app"]
+   FRONTEND_URL        → https://your-frontend.up.railway.app
+   API_KEY_ENCRYPTION_KEY → (generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+   DEBUG               → false
+   ```
+   Copy the same DB/Redis vars to the Celery Worker service.
+
+4. **Set build args** on the Frontend service:
+   ```
+   VITE_API_URL → https://your-backend.up.railway.app
+   ```
+
+5. **Deploy** — Railway auto-deploys on push to `main`.
+
+### Self-Hosted (Docker Compose)
+
+For VPS or bare-metal deployment:
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/AviDowek/AgentML.git
+cd AgentML
+cp .env.example .env
+cp backend/.env.example backend/.env
+
+# 2. Edit both .env files with production values
+#    - Set POSTGRES_PASSWORD, REDIS_PASSWORD in root .env
+#    - Set SECRET_KEY, LLM_API_KEY, API_KEY_ENCRYPTION_KEY in backend/.env
+#    - Set CORS_ORIGINS to your domain
+
+# 3. Start everything
+docker-compose -f docker-compose.prod.yml up --build -d
+```
+
+The app will be available on port 80 (frontend) and 8000 (backend API).
+For HTTPS, put nginx or Caddy in front as a reverse proxy.
 
 ## Testing
 

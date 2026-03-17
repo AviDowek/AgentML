@@ -1,4 +1,4 @@
-"""API key management service."""
+"""API key management service with encryption support."""
 from typing import Optional
 from uuid import UUID
 
@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.models.api_key import ApiKey, LLMProvider
 from app.schemas.api_key import ApiKeyCreate
+from app.services.encryption import encrypt, decrypt
 
 
 def mask_api_key(key: str) -> str:
-    """Mask an API key for display, showing only first 4 and last 4 characters."""
-    if len(key) <= 12:
+    """Mask an API key for display, showing only last 4 characters."""
+    if len(key) <= 4:
         return "*" * len(key)
-    return f"{key[:4]}{'*' * (len(key) - 8)}{key[-4:]}"
+    return f"{'*' * (len(key) - 4)}{key[-4:]}"
 
 
 def get_api_key(db: Session, provider: LLMProvider) -> Optional[ApiKey]:
@@ -41,22 +42,21 @@ def get_api_key_status(db: Session) -> dict[str, bool]:
 
 
 def create_or_update_api_key(db: Session, data: ApiKeyCreate) -> ApiKey:
-    """Create or update an API key for a provider."""
+    """Create or update an API key for a provider. Encrypts the key before storage."""
     existing = get_api_key(db, data.provider)
+    encrypted_key = encrypt(data.api_key)
 
     if existing:
-        # Update existing key
-        existing.api_key = data.api_key
+        existing.api_key = encrypted_key
         if data.name is not None:
             existing.name = data.name
         db.commit()
         db.refresh(existing)
         return existing
     else:
-        # Create new key
         api_key = ApiKey(
             provider=data.provider,
-            api_key=data.api_key,
+            api_key=encrypted_key,
             name=data.name,
         )
         db.add(api_key)
@@ -76,8 +76,8 @@ def delete_api_key(db: Session, provider: LLMProvider) -> bool:
 
 
 def get_decrypted_key(db: Session, provider: LLMProvider) -> Optional[str]:
-    """Get the actual API key value for a provider (for internal use)."""
+    """Get the actual decrypted API key value for a provider (for internal use)."""
     api_key = get_api_key(db, provider)
     if api_key:
-        return api_key.api_key
+        return decrypt(api_key.api_key)
     return None

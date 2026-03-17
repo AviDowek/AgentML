@@ -4,11 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user_required
 from app.models.api_key import LLMProvider
+from app.models.user import User
 from app.models.app_settings import AppSettings, AIModel, AI_MODEL_CONFIG
 from app.schemas.api_key import ApiKeyCreate, ApiKeyResponse, ApiKeyStatusResponse
 from app.schemas.app_settings import AppSettingsResponse, AppSettingsUpdate, AIModelOption
 from app.services import api_key_service
+from app.services.encryption import decrypt
 
 router = APIRouter(prefix="/api/v1/api-keys", tags=["API Keys"])
 
@@ -20,34 +23,44 @@ def get_key_status(db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[ApiKeyResponse])
-def list_api_keys(db: Session = Depends(get_db)):
-    """List all stored API keys (masked)."""
+def list_api_keys(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
+):
+    """List all stored API keys (masked). Requires authentication."""
     keys = api_key_service.get_all_api_keys(db)
-    return [
-        ApiKeyResponse(
-            id=key.id,
-            provider=key.provider,
-            name=key.name,
-            key_preview=api_key_service.mask_api_key(key.api_key),
-            created_at=key.created_at,
-            updated_at=key.updated_at,
+    results = []
+    for key in keys:
+        try:
+            plain = decrypt(key.api_key)
+        except ValueError:
+            plain = "****"
+        results.append(
+            ApiKeyResponse(
+                id=key.id,
+                provider=key.provider,
+                name=key.name,
+                key_preview=api_key_service.mask_api_key(plain),
+                created_at=key.created_at,
+                updated_at=key.updated_at,
+            )
         )
-        for key in keys
-    ]
+    return results
 
 
 @router.post("", response_model=ApiKeyResponse, status_code=status.HTTP_201_CREATED)
 def create_or_update_key(
     data: ApiKeyCreate,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
 ):
-    """Create or update an API key for a provider."""
+    """Create or update an API key for a provider. Requires authentication."""
     key = api_key_service.create_or_update_api_key(db, data)
     return ApiKeyResponse(
         id=key.id,
         provider=key.provider,
         name=key.name,
-        key_preview=api_key_service.mask_api_key(key.api_key),
+        key_preview=api_key_service.mask_api_key(data.api_key),  # Mask the original plaintext
         created_at=key.created_at,
         updated_at=key.updated_at,
     )
@@ -57,6 +70,7 @@ def create_or_update_key(
 def delete_api_key(
     provider: LLMProvider,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user_required),
 ):
     """Delete an API key for a provider."""
     deleted = api_key_service.delete_api_key(db, provider)

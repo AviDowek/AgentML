@@ -1,6 +1,13 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from functools import lru_cache
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Fallback key only used in local development
+_DEV_SECRET_KEY = secrets.token_urlsafe(32)
 
 
 class Settings(BaseSettings):
@@ -29,7 +36,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_api_base_url: str = "https://api.openai.com/v1"
 
-    # CORS
+    # CORS — set via CORS_ORIGINS env var in production
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
 
     # File uploads
@@ -56,9 +63,13 @@ class Settings(BaseSettings):
     modal_enabled: bool = False  # Whether Modal is configured
 
     # Authentication
-    secret_key: str = secrets.token_urlsafe(32)  # JWT signing key
+    secret_key: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
+
+    # Rate limiting
+    rate_limit_per_minute: int = 30  # General API rate limit
+    rate_limit_llm_per_minute: int = 10  # LLM-triggering endpoints
 
     # Google OAuth
     google_client_id: str = ""
@@ -75,8 +86,30 @@ class Settings(BaseSettings):
     # Frontend URL (for email links)
     frontend_url: str = "http://localhost:5173"
 
+    # API key encryption key (Fernet) — generate with:
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    api_key_encryption_key: str = ""
+
+    @field_validator("secret_key", mode="before")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if not v or v in ("your-secret-key-here", ""):
+            logger.warning(
+                "SECRET_KEY not set — using auto-generated key. "
+                "Sessions will not survive restarts. "
+                "Set SECRET_KEY in your .env for production."
+            )
+            return _DEV_SECRET_KEY
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    settings = Settings()
+    if not settings.debug and settings.secret_key == _DEV_SECRET_KEY:
+        logger.warning(
+            "Running in production mode without a stable SECRET_KEY. "
+            "Set SECRET_KEY in environment variables."
+        )
+    return settings
