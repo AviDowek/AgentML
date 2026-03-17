@@ -29,8 +29,8 @@ export type MetricDirection = 'maximize' | 'minimize';
 // Execution Mode for Auto DS Sessions
 export type ExecutionMode = 'legacy' | 'adaptive' | 'phased' | 'dynamic';
 
-// Validation Strategy for experiments
-export type ValidationStrategy = 'standard' | 'robust' | 'strict';
+// Validation Strategy for experiments (used by Auto DS config)
+export type ValidationStrategyType = 'standard' | 'robust' | 'strict';
 
 // Auto DS Config Types
 export interface AutoDSConfig {
@@ -47,7 +47,7 @@ export interface AutoDSConfig {
   phased_min_baseline_improvement?: number;
   dynamic_experiments_per_cycle?: number;
   // Validation strategy settings (Tier 2)
-  validation_strategy?: ValidationStrategy;
+  validation_strategy?: ValidationStrategyType;
   validation_num_seeds?: number;
   validation_cv_folds?: number;
   // Tier 1 feature flags
@@ -1269,7 +1269,7 @@ export interface AutoDSSession {
   phased_min_baseline_improvement: number;
   dynamic_experiments_per_cycle: number;
   // Validation strategy settings
-  validation_strategy: ValidationStrategy;
+  validation_strategy: ValidationStrategyType;
   validation_num_seeds: number;
   validation_cv_folds: number;
   // Tier 1 feature flags
@@ -1312,7 +1312,7 @@ export interface AutoDSSessionCreate {
   phased_min_baseline_improvement?: number;
   dynamic_experiments_per_cycle?: number;
   // Validation strategy settings
-  validation_strategy?: ValidationStrategy;
+  validation_strategy?: ValidationStrategyType;
   validation_num_seeds?: number;
   validation_cv_folds?: number;
   // Tier 1 feature flags

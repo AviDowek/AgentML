@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Project, DatasetSpec, AutoDSConfig, ExecutionMode, ValidationStrategy } from '../types/api';
+import type { Project, DatasetSpec, AutoDSConfig, ExecutionMode } from '../types/api';
 import {
   startProjectAutoDS,
   stopProjectAutoDS,

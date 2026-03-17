@@ -21,7 +21,7 @@ export default function Settings() {
 
   // AI Model state
   const [aiModels, setAiModels] = useState<AIModelOption[]>([]);
-  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [_appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [selectedAiModel, setSelectedAiModel] = useState<AIModel | null>(null);
   const [savingModel, setSavingModel] = useState(false);
 

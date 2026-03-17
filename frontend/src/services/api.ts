@@ -508,22 +508,14 @@ export async function deleteExperiment(experimentId: string): Promise<void> {
 export async function runExperiment(
   experimentId: string,
   options?: {
-    backend?: 'local' | 'modal';
-    resourceLimitsEnabled?: boolean;
-    numCpus?: number;
-    numGpus?: number;
-    memoryLimitGb?: number;
+    backend?: 'modal';
   }
 ): Promise<ExperimentRunResponse> {
   // Build request body if options provided
   const body = options
     ? JSON.stringify({
         training_options: {
-          backend: options.backend || 'local',
-          resource_limits_enabled: options.resourceLimitsEnabled ?? true,
-          num_cpus: options.numCpus || null,
-          num_gpus: options.numGpus || null,
-          memory_limit_gb: options.memoryLimitGb || null,
+          backend: options.backend || 'modal',
         },
       })
     : undefined;
@@ -975,7 +967,7 @@ export async function deleteApiKey(provider: LLMProvider): Promise<void> {
 // App Settings
 // ============================================
 
-import type { AIModel, AIModelOption, AppSettings, AppSettingsUpdate } from '../types/api';
+import type { AIModelOption, AppSettings, AppSettingsUpdate } from '../types/api';
 
 export async function getAvailableAIModels(): Promise<AIModelOption[]> {
   return apiFetch<AIModelOption[]>('/api/v1/settings/ai-models');

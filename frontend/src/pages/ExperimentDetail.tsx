@@ -179,11 +179,7 @@ export default function ExperimentDetail() {
   };
 
   const handleRunWithOptions = async (options: {
-    backend: 'local' | 'modal';
-    resourceLimitsEnabled: boolean;
-    numCpus?: number;
-    numGpus?: number;
-    memoryLimitGb?: number;
+    backend: 'modal';
   }) => {
     if (!experimentId) return;
     setShowTrainingOptions(false);

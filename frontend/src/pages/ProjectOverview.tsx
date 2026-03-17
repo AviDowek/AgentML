@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react'
-import {useParams, Link, Routes, Route, NavLink} from 'react-router-dom'
+import {useParams, Routes, Route, NavLink} from 'react-router-dom'
 import {apiGet} from '../api/client'
 import Data from './Data'
 import Experiments from './Experiments'
