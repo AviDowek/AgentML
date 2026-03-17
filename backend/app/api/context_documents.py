@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.project import Project
 from app.models.context_document import ContextDocument
 from app.schemas.context_document import (
@@ -35,8 +37,10 @@ router = APIRouter(tags=["context-documents"])
     "/context-documents/supported-extensions",
     response_model=SupportedExtensionsResponse,
 )
-async def get_supported_file_extensions():
+async def get_supported_file_extensions(current_user: Optional[User] = Depends(get_current_user)):
     """Get list of supported file extensions for context documents."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     return SupportedExtensionsResponse(
         extensions=get_supported_extensions(),
         max_file_size_mb=None,  # No file size limit
@@ -54,6 +58,7 @@ async def upload_context_document(
     name: str = Form(..., min_length=1, max_length=255, description="Name for this document"),
     explanation: str = Form(..., min_length=10, max_length=5000, description="Explanation of what this document contains and how it should be used"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Upload a context document to a project.
 
@@ -71,6 +76,8 @@ async def upload_context_document(
         name: User-provided name for the document
         explanation: Explanation of what this document contains (REQUIRED)
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -120,6 +127,7 @@ async def list_context_documents(
     project_id: UUID,
     include_inactive: bool = False,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List all context documents for a project.
 
@@ -127,6 +135,8 @@ async def list_context_documents(
         project_id: UUID of the project
         include_inactive: Whether to include inactive documents (default: False)
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -163,6 +173,7 @@ async def get_context_document(
     document_id: UUID,
     include_content: bool = False,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get a single context document by ID.
 
@@ -170,6 +181,8 @@ async def get_context_document(
         document_id: UUID of the context document
         include_content: Whether to include full extracted text (default: False)
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     context_doc = db.query(ContextDocument).filter(ContextDocument.id == document_id).first()
 
     if not context_doc:
@@ -193,11 +206,14 @@ async def update_context_document(
     document_id: UUID,
     update: ContextDocumentUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update a context document's metadata.
 
     Can update name, explanation, and active status.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     context_doc = db.query(ContextDocument).filter(ContextDocument.id == document_id).first()
 
     if not context_doc:
@@ -225,8 +241,11 @@ async def update_context_document(
 async def delete_context_document(
     document_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Delete a context document and its file."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     context_doc = db.query(ContextDocument).filter(ContextDocument.id == document_id).first()
 
     if not context_doc:
@@ -254,11 +273,14 @@ async def delete_context_document(
 async def reextract_text(
     document_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Re-run text extraction for a document.
 
     Useful if extraction initially failed or to refresh content.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     context_doc = db.query(ContextDocument).filter(ContextDocument.id == document_id).first()
 
     if not context_doc:
@@ -290,8 +312,11 @@ async def reextract_text(
 async def toggle_document_active(
     document_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Toggle a document's active status."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     context_doc = db.query(ContextDocument).filter(ContextDocument.id == document_id).first()
 
     if not context_doc:

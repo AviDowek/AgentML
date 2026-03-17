@@ -1,6 +1,6 @@
 """Model version API endpoints."""
 import logging
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 import pandas as pd
@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.project import Project
 from app.models.model_version import ModelVersion, ModelStatus
 from app.models.validation_sample import ValidationSample
@@ -51,8 +53,11 @@ def create_model_version(
     project_id: UUID,
     model: ModelVersionCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new model version for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -86,8 +91,11 @@ def list_model_versions(
     project_id: UUID,
     status_filter: ModelStatus | None = None,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List all model versions for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -107,8 +115,10 @@ def list_model_versions(
     "/models/{model_id}",
     response_model=ModelVersionResponse,
 )
-def get_model_version(model_id: UUID, db: Session = Depends(get_db)):
+def get_model_version(model_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get a model version by ID."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
     if not model:
         raise HTTPException(
@@ -126,6 +136,7 @@ def promote_model(
     model_id: UUID,
     promote_request: ModelPromoteRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Promote a model to a new status (candidate, shadow, production).
 
@@ -133,6 +144,8 @@ def promote_model(
     require an override_reason to proceed with promotion. The override
     will be logged in the project's lab notebook for audit purposes.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.models.experiment import Trial
     from app.models.research_cycle import LabNotebookEntry, LabNotebookAuthorType
     from app.services.risk_scoring import get_model_risk_status, format_promotion_block_message
@@ -241,8 +254,10 @@ def promote_model(
 
 
 @router.delete("/models/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_model_version(model_id: UUID, db: Session = Depends(get_db)):
+def delete_model_version(model_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Delete a model version."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
     if not model:
         raise HTTPException(
@@ -259,11 +274,14 @@ def delete_model_version(model_id: UUID, db: Session = Depends(get_db)):
 def get_model_risk_status(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get the risk status for a model to inform promotion decisions.
 
     Returns risk level, whether override is required, and detailed risk information.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.models.experiment import Trial
     from app.services.risk_scoring import get_model_risk_status as compute_risk_status
 
@@ -328,12 +346,15 @@ def predict(
     model_id: UUID,
     request: PredictionRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Make predictions using a trained model.
 
     The features dict should contain values for all features the model expects.
     Feature names and types can be found in the model's serving_config_json.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Get model
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
     if not model:
@@ -461,6 +482,7 @@ async def explain_model(
     model_id: UUID,
     request: ModelExplainRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Ask questions about a model and get AI-powered explanations.
 
@@ -474,6 +496,8 @@ async def explain_model(
     - "Why does the model perform well/poorly?"
     - "How can I improve the model?"
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.llm_client import get_llm_client
 
     # Get model
@@ -596,6 +620,7 @@ def list_validation_samples(
         default="error_desc", description="Sort order"
     ),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List validation samples for a model.
 
@@ -605,6 +630,8 @@ def list_validation_samples(
     - row_index: Original row order
     - random: Random sample
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify model exists
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
     if not model:
@@ -650,8 +677,11 @@ def list_validation_samples(
 def get_validation_sample(
     sample_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get a single validation sample by ID."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     sample = db.query(ValidationSample).filter(ValidationSample.id == sample_id).first()
     if not sample:
         raise HTTPException(
@@ -669,12 +699,15 @@ def what_if_prediction(
     model_id: UUID,
     request: WhatIfRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Run a what-if prediction by modifying features from an existing validation sample.
 
     This allows exploring "what would happen if feature X was Y?" scenarios
     by taking an existing sample, modifying specific features, and re-running prediction.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify model exists and has artifact
     model = db.query(ModelVersion).filter(ModelVersion.id == model_id).first()
     if not model:
@@ -795,6 +828,7 @@ def what_if_prediction(
 def get_model_testing_data(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get feature statistics and sample data for model testing UI.
 
@@ -804,6 +838,8 @@ def get_model_testing_data(
     - A random sample from validation data as starting point
     - Top important features for quick access
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import random
     from statistics import mean, median
 
@@ -918,12 +954,15 @@ def get_model_testing_data(
 def get_random_sample(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get a random sample from validation data for model testing.
 
     Returns just the feature values as a dict that can be used directly
     in the prediction form.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import random
 
     # Verify model exists
@@ -971,6 +1010,7 @@ def predict_raw(
         default=False, description="Include transformed features in response (for debugging)"
     ),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Make predictions using raw, untransformed data.
 
@@ -980,6 +1020,8 @@ def predict_raw(
     Use this when you have original data (e.g., from a CSV) that needs to be
     transformed before the model can make predictions.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.feature_pipeline import get_pipeline_for_model
 
     # Get model
@@ -1074,12 +1116,15 @@ def predict_batch(
     model_id: UUID,
     request: BatchPredictionRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Make batch predictions using raw data.
 
     Submit multiple records at once for efficient batch prediction.
     Feature transformations are applied automatically.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.feature_pipeline import get_pipeline_for_model
 
     # Get model
@@ -1166,12 +1211,15 @@ def predict_batch(
 def get_model_pipeline(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get information about the feature transformation pipeline for a model.
 
     Returns details about what transformations are applied to raw data
     before predictions, including required input columns.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.feature_pipeline import get_pipeline_for_model
 
     # Get model
@@ -1219,12 +1267,15 @@ def get_model_pipeline(
 def get_export_info(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get information about exporting a model.
 
     Returns whether the model can be exported, estimated size,
     and required packages.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import os
     from pathlib import Path
 
@@ -1291,6 +1342,7 @@ def get_export_info(
 def export_model(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Export a model as a downloadable ZIP file.
 
@@ -1301,6 +1353,8 @@ def export_model(
     - requirements.txt (Python dependencies)
     - README.md (usage instructions)
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import io
     import os
     import zipfile
@@ -1441,6 +1495,7 @@ predictions = predictor.predict(df)
 def get_remote_model_status(
     model_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Check if a model is available for remote predictions on Modal.
 

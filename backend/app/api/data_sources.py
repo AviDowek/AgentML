@@ -22,6 +22,9 @@ from app.schemas.data_source import (
 from app.services.schema_analyzer import SchemaAnalyzer, SUPPORTED_EXTENSIONS, get_file_type
 from app.services.file_handlers import read_file, get_handler
 from app.services.data_profiler import profile_data_source, profile_all_data_sources
+from app.core.security import get_current_user
+from app.models.user import User
+from app.api.dependencies import get_project_with_access, get_project_with_write_access
 
 
 class DataPreviewResponse(BaseModel):
@@ -50,6 +53,7 @@ async def upload_data_source(
     sheet_name: Optional[str] = Form(None),
     table_name: Optional[str] = Form(None),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Upload a data file as a new data source.
 
@@ -72,9 +76,11 @@ async def upload_data_source(
         sheet_name: Excel sheet name to analyze (default: first sheet)
         table_name: SQLite table name to analyze (default: first table)
     """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     settings = get_settings()
 
-    # Verify project exists
+    # Verify project exists and user has write access
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(
@@ -203,8 +209,11 @@ def create_data_source(
     project_id: UUID,
     data_source: DataSourceCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new data source for a project."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -229,8 +238,10 @@ def create_data_source(
     "/projects/{project_id}/data-sources",
     response_model=list[DataSourceResponse],
 )
-def list_data_sources(project_id: UUID, db: Session = Depends(get_db)):
+def list_data_sources(project_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """List all data sources for a project."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -246,8 +257,10 @@ def list_data_sources(project_id: UUID, db: Session = Depends(get_db)):
     "/data-sources/{data_source_id}",
     response_model=DataSourceResponse,
 )
-def get_data_source(data_source_id: UUID, db: Session = Depends(get_db)):
+def get_data_source(data_source_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get a data source by ID."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     data_source = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not data_source:
         raise HTTPException(
@@ -265,8 +278,11 @@ def update_data_source(
     data_source_id: UUID,
     data_source_update: DataSourceUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update a data source."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     data_source = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not data_source:
         raise HTTPException(
@@ -284,8 +300,10 @@ def update_data_source(
 
 
 @router.delete("/data-sources/{data_source_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_data_source(data_source_id: UUID, db: Session = Depends(get_db)):
+def delete_data_source(data_source_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Delete a data source."""
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     data_source = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not data_source:
         raise HTTPException(
@@ -307,6 +325,7 @@ def get_data_source_data(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(100, ge=1, le=1000, description="Rows per page"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get the actual data from a data source with pagination.
 
@@ -318,6 +337,8 @@ def get_data_source_data(
         page: Page number (1-indexed, default 1)
         page_size: Number of rows per page (default 100, max 1000)
     """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     data_source = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not data_source:
         raise HTTPException(
@@ -445,6 +466,7 @@ def profile_all_project_data_sources(
     project_id: UUID,
     sample_rows: int = Query(50000, ge=1000, le=100000, description="Max rows to sample per source"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Profile all data sources in a project.
 
@@ -462,6 +484,8 @@ def profile_all_project_data_sources(
     Returns:
         ProfileAllResponse with profiles for all data sources
     """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -507,6 +531,7 @@ def profile_single_data_source(
     data_source_id: UUID,
     sample_rows: int = Query(50000, ge=1000, le=100000, description="Max rows to sample"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Profile a single data source.
 
@@ -520,6 +545,8 @@ def profile_single_data_source(
     Returns:
         DataProfileResponse with the profile data
     """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     data_source = db.query(DataSource).filter(DataSource.id == data_source_id).first()
     if not data_source:
         raise HTTPException(

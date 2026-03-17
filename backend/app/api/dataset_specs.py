@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.project import Project
 from app.models.dataset_spec import DatasetSpec
 from app.models.experiment import Experiment, ExperimentStatus
@@ -79,8 +81,11 @@ def create_dataset_spec(
     project_id: UUID,
     dataset_spec: DatasetSpecCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new dataset specification for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -115,8 +120,10 @@ def create_dataset_spec(
     "/projects/{project_id}/dataset-specs",
     response_model=list[DatasetSpecResponse],
 )
-def list_dataset_specs(project_id: UUID, db: Session = Depends(get_db)):
+def list_dataset_specs(project_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """List all dataset specifications for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -132,8 +139,10 @@ def list_dataset_specs(project_id: UUID, db: Session = Depends(get_db)):
     "/dataset-specs/{dataset_spec_id}",
     response_model=DatasetSpecResponse,
 )
-def get_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db)):
+def get_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get a dataset specification by ID."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
         raise HTTPException(
@@ -151,8 +160,11 @@ def update_dataset_spec(
     dataset_spec_id: UUID,
     dataset_spec_update: DatasetSpecUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update a dataset specification."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
         raise HTTPException(
@@ -170,8 +182,10 @@ def update_dataset_spec(
 
 
 @router.delete("/dataset-specs/{dataset_spec_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db)):
+def delete_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Delete a dataset specification."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
         raise HTTPException(
@@ -193,12 +207,15 @@ def get_dataset_spec_data(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(100, ge=1, le=1000, description="Rows per page"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get data preview for a dataset specification.
 
     This endpoint builds the dataset from the configured data sources
     and returns a paginated preview of the data.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
         raise HTTPException(
@@ -300,8 +317,11 @@ def get_dataset_experiments(
     dataset_spec_id: UUID,
     include_iterations: bool = Query(True, description="Include auto-improve iterations"),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get all experiments for a dataset specification."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Get dataset spec
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
@@ -429,8 +449,11 @@ def get_dataset_experiments(
 def download_dataset_spec(
     dataset_spec_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Download the built dataset as a CSV file."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     dataset_spec = db.query(DatasetSpec).filter(DatasetSpec.id == dataset_spec_id).first()
     if not dataset_spec:
         raise HTTPException(

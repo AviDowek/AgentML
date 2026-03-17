@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.project import Project
 from app.models.experiment import Experiment, Trial, ExperimentStatus
 from app.models.model_version import ModelVersion
@@ -85,8 +87,11 @@ def create_experiment(
     project_id: UUID,
     experiment: ExperimentCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new experiment for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -114,8 +119,10 @@ def create_experiment(
     "/projects/{project_id}/experiments",
     response_model=list[ExperimentResponse],
 )
-def list_experiments(project_id: UUID, db: Session = Depends(get_db)):
+def list_experiments(project_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """List all experiments for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -131,8 +138,10 @@ def list_experiments(project_id: UUID, db: Session = Depends(get_db)):
     "/experiments/{experiment_id}",
     response_model=ExperimentDetailResponse,
 )
-def get_experiment(experiment_id: UUID, db: Session = Depends(get_db)):
+def get_experiment(experiment_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get an experiment by ID with summary info."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -288,8 +297,11 @@ def update_experiment(
     experiment_id: UUID,
     experiment_update: ExperimentUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -307,11 +319,13 @@ def update_experiment(
 
 
 @router.delete("/experiments/{experiment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_experiment(experiment_id: UUID, db: Session = Depends(get_db)):
+def delete_experiment(experiment_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Delete an experiment.
 
     If the experiment has a running or pending task, it will be cancelled first.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -347,11 +361,14 @@ class BulkDeleteResponse(BaseModel):
 def bulk_delete_experiments(
     request: BulkDeleteRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Delete multiple experiments at once.
 
     Skips experiments that are currently running and returns info about failures.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     deleted_count = 0
     failed_ids = []
     errors = []
@@ -413,8 +430,11 @@ def update_auto_iterate_settings(
     experiment_id: UUID,
     request: AutoIterateSettingsRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update auto-iterate settings for an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -450,8 +470,11 @@ def update_auto_iterate_settings(
 def get_auto_iterate_settings(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get current auto-iterate settings for an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -684,8 +707,11 @@ async def apply_fix(
     experiment_id: UUID,
     request: ApplyFixRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Apply an automated fix to the experiment using the LLM agent."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -772,8 +798,11 @@ def run_experiment(
     experiment_id: UUID,
     request: ExperimentRunRequest = None,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Start running an experiment (asynchronous)."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -866,8 +895,10 @@ def run_experiment(
     summary="Get available training options",
     description="Get the current training configuration and available backends.",
 )
-def get_training_options():
+def get_training_options(current_user: Optional[User] = Depends(get_current_user)):
     """Get available training options and their current configuration."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.core.config import get_settings
     from app.services.modal_runner import get_modal_status
 
@@ -937,7 +968,7 @@ def _revoke_celery_task(task_id: str) -> bool:
     "/experiments/{experiment_id}/cancel",
     response_model=ExperimentRunResponse,
 )
-def cancel_experiment(experiment_id: UUID, db: Session = Depends(get_db)):
+def cancel_experiment(experiment_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Cancel a running or pending experiment.
 
     This will:
@@ -945,6 +976,8 @@ def cancel_experiment(experiment_id: UUID, db: Session = Depends(get_db)):
     2. Update experiment status to CANCELLED
     3. For Modal tasks, the next poll will detect cancellation and abort
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -1029,8 +1062,11 @@ Experiments that fail validation will be reported but won't stop others from run
 def run_experiments_batch(
     request: BatchRunExperimentsRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Start running multiple experiments in parallel (asynchronous)."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     results = []
     queued_count = 0
     failed_count = 0
@@ -1104,11 +1140,13 @@ def run_experiments_batch(
     "/experiments/{experiment_id}/progress",
     response_model=ExperimentProgressResponse,
 )
-def get_experiment_progress(experiment_id: UUID, db: Session = Depends(get_db)):
+def get_experiment_progress(experiment_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get the progress of a running experiment.
 
     Returns real-time progress information from the Celery task.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
         raise HTTPException(
@@ -1193,8 +1231,11 @@ def create_trial(
     experiment_id: UUID,
     trial: TrialCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new trial for an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify experiment exists
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
@@ -1219,8 +1260,10 @@ def create_trial(
     "/experiments/{experiment_id}/trials",
     response_model=list[TrialResponse],
 )
-def list_trials(experiment_id: UUID, db: Session = Depends(get_db)):
+def list_trials(experiment_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """List all trials for an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify experiment exists
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
@@ -1236,8 +1279,10 @@ def list_trials(experiment_id: UUID, db: Session = Depends(get_db)):
     "/trials/{trial_id}",
     response_model=TrialResponse,
 )
-def get_trial(trial_id: UUID, db: Session = Depends(get_db)):
+def get_trial(trial_id: UUID, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_current_user)):
     """Get a trial by ID."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     trial = db.query(Trial).filter(Trial.id == trial_id).first()
     if not trial:
         raise HTTPException(
@@ -1257,12 +1302,15 @@ def get_trial(trial_id: UUID, db: Session = Depends(get_db)):
 async def generate_training_critique(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Generate AI critique of training results with improvement suggestions.
 
     Analyzes training logs, leaderboard, and metrics to provide actionable
     feedback for improving model performance.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.prompts import get_training_critique_prompt
     from app.services.llm_client import get_llm_client
     from app.schemas.agent import TrainingCritiqueResult
@@ -1421,11 +1469,14 @@ async def generate_training_critique(
 def get_training_critique(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get the cached training critique for an experiment.
 
     Returns the previously generated critique if available.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Get experiment
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
@@ -1521,8 +1572,11 @@ This will:
 async def trigger_improvement(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Trigger auto-improvement pipeline for a completed experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.tasks.experiment_tasks import run_auto_improve_pipeline
 
     # Get experiment
@@ -1580,8 +1634,11 @@ for metrics progression across iterations.
 def get_experiment_iterations(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get all iterations of an experiment (parent + children chain)."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Get the requested experiment
     experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not experiment:
@@ -1754,8 +1811,11 @@ def get_experiment_iterations(
 def get_improvement_status(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get the status of the improvement pipeline for an experiment."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.models.agent_run import AgentRun
 
     # Get experiment
@@ -1817,6 +1877,7 @@ def get_improvement_status(
 def get_overfitting_analysis(
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get overfitting analysis for an experiment chain.
 
@@ -1827,6 +1888,8 @@ def get_overfitting_analysis(
     - Recommendation (continue, warning, stop)
     - Best iteration to use if overfitting is detected
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.holdout_validator import get_overfitting_report
 
     # Get experiment
@@ -1856,12 +1919,15 @@ def get_iterations_overfitting(
     project_id: UUID,
     experiment_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get overfitting status for all iterations in a chain.
 
     This provides a summary view suitable for displaying in a UI,
     showing the holdout score and risk level for each iteration.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from app.services.holdout_validator import get_overfitting_report
 
     # Verify project exists
@@ -1929,6 +1995,7 @@ def get_experiment_visualization(
     experiment_id: UUID,
     max_points: int = 500,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get visualization data for experiment results.
 
@@ -1940,6 +2007,8 @@ def get_experiment_visualization(
     The response adapts to what data is available and provides
     fallback visualizations if primary data is missing.
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     import logging
     logger = logging.getLogger(__name__)
 
@@ -2549,6 +2618,7 @@ def get_experiment_notebook(
     experiment_id: UUID,
     format: str = "json",
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get a reproducible Jupyter notebook for an experiment.
 
@@ -2559,6 +2629,8 @@ def get_experiment_notebook(
     Returns:
         Notebook content as JSON or downloadable file
     """
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     from fastapi.responses import Response, JSONResponse
     from app.services.notebook_generator import generate_experiment_notebook
 

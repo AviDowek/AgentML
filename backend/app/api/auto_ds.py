@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.project import Project
 from app.models.auto_ds_session import (
     AutoDSSession,
@@ -55,8 +57,11 @@ def create_auto_ds_session(
     project_id: UUID,
     session_data: AutoDSSessionCreate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new Auto DS session for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -93,8 +98,11 @@ def list_auto_ds_sessions(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List Auto DS sessions for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     # Verify project exists
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -125,8 +133,11 @@ def get_auto_ds_session(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get details of an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -150,8 +161,11 @@ def update_auto_ds_session(
     session_id: UUID,
     session_data: AutoDSSessionUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -191,8 +205,11 @@ def start_auto_ds_session(
     session_id: UUID,
     request: Optional[AutoDSSessionStartRequest] = None,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Start an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -240,8 +257,11 @@ def pause_auto_ds_session(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Pause a running Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -274,8 +294,11 @@ def stop_auto_ds_session(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Stop an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -308,8 +331,11 @@ def get_auto_ds_session_progress(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get detailed progress of an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -373,8 +399,11 @@ def delete_auto_ds_session(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Delete an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -409,8 +438,11 @@ def list_session_iterations(
     project_id: UUID,
     session_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List iterations for an Auto DS session with experiments."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -504,8 +536,11 @@ def get_session_iteration(
     session_id: UUID,
     iteration_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get details of a specific iteration."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     iteration = db.query(AutoDSIteration).filter(
         AutoDSIteration.id == iteration_id,
         AutoDSIteration.session_id == session_id,
@@ -542,8 +577,11 @@ def list_session_insights(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List research insights from an Auto DS session."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -574,8 +612,11 @@ def list_project_insights(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List all research insights for a project."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(
@@ -607,8 +648,11 @@ def list_global_insights(
     active_only: bool = True,
     min_confidence: float = 0.0,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """List global insights across all projects."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     query = db.query(GlobalInsight)
 
     if active_only:
@@ -633,8 +677,11 @@ def list_global_insights(
 def get_global_insight(
     insight_id: UUID,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get details of a global insight."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     insight = db.query(GlobalInsight).filter(GlobalInsight.id == insight_id).first()
 
     if not insight:
