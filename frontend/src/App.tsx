@@ -13,6 +13,7 @@ import ModelDetail from './pages/ModelDetail';
 import AutoDS from './pages/AutoDS';
 import AutoDSDetail from './pages/AutoDSDetail';
 import Settings from './pages/Settings';
+import Guide from './pages/Guide';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AcceptInvite from './pages/AcceptInvite';
@@ -41,6 +42,7 @@ function App() {
             <Route path="auto-ds" element={<ProtectedRoute><AutoDS /></ProtectedRoute>} />
             <Route path="auto-ds/:sessionId" element={<ProtectedRoute><AutoDSDetail /></ProtectedRoute>} />
             <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
           </Route>
         </Routes>
       </BrowserRouter>

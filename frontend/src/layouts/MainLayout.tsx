@@ -70,6 +70,7 @@ export default function MainLayout() {
                 <li><Link to="/models">Models</Link></li>
                 <li><Link to="/auto-ds">Auto DS</Link></li>
                 <li><Link to="/settings">Settings</Link></li>
+                <li><Link to="/guide">Guide</Link></li>
               </>
             )}
           </ul>
