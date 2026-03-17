@@ -18,6 +18,4 @@ COPY backend/ .
 # Create upload and artifacts directories
 RUN mkdir -p /app/uploads /app/artifacts
 
-EXPOSE 8000
-
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+CMD ["celery", "-A", "app.core.celery_app", "worker", "--loglevel=info", "--concurrency=4", "-Q", "celery"]
