@@ -37,6 +37,7 @@ from app.schemas.model_version import (
     RemotePredictionResponse,
     RemoteModelStatusResponse,
 )
+from app.api.dependencies import check_project_access
 from app.services.automl_runner import get_runner_for_task
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,8 @@ def create_model_version(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     db_model = ModelVersion(
         project_id=project_id,
@@ -103,6 +106,8 @@ def list_model_versions(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     query = db.query(ModelVersion).filter(ModelVersion.project_id == project_id)
     if status_filter:
@@ -125,6 +130,9 @@ def get_model_version(model_id: UUID, db: Session = Depends(get_db), current_use
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
     return model
 
 
@@ -156,6 +164,9 @@ def promote_model(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Validate status transition
     valid_promote_statuses = [ModelStatus.CANDIDATE, ModelStatus.SHADOW, ModelStatus.PRODUCTION]
@@ -264,6 +275,9 @@ def delete_model_version(model_id: UUID, db: Session = Depends(get_db), current_
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     db.delete(model)
     db.commit()
@@ -291,6 +305,9 @@ def get_model_risk_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Default response for models without risk data
     response = {
@@ -362,6 +379,9 @@ def predict(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Validate model has artifact
     if not model.artifact_location:
@@ -507,6 +527,9 @@ async def explain_model(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Gather model context
     context_parts = [f"# Model: {model.name}"]
@@ -639,6 +662,9 @@ def list_validation_samples(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Get total count
     total = db.query(ValidationSample).filter(
@@ -688,6 +714,11 @@ def get_validation_sample(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Validation sample {sample_id} not found",
         )
+    model = db.query(ModelVersion).filter(ModelVersion.id == sample.model_version_id).first()
+    if model:
+        project = db.query(Project).filter(Project.id == model.project_id).first()
+        if not check_project_access(db, project, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this validation sample")
     return ValidationSampleResponse.from_db_model(sample)
 
 
@@ -715,6 +746,9 @@ def what_if_prediction(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     if not model.artifact_location:
         raise HTTPException(
@@ -850,6 +884,9 @@ def get_model_testing_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Get serving config
     serving_config = model.serving_config_json or {}
@@ -972,6 +1009,9 @@ def get_random_sample(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Get random validation sample
     samples = db.query(ValidationSample).filter(
@@ -1031,6 +1071,9 @@ def predict_raw(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Validate model has artifact
     if not model.artifact_location:
@@ -1134,6 +1177,9 @@ def predict_batch(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     if not model.artifact_location:
         raise HTTPException(
@@ -1229,6 +1275,9 @@ def get_model_pipeline(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Get pipeline
     pipeline = get_pipeline_for_model(db, str(model_id))
@@ -1288,6 +1337,9 @@ def get_export_info(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     serving_config = model.serving_config_json or {}
     task_type = serving_config.get("task_type", "unknown")
@@ -1371,6 +1423,9 @@ def export_model(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     if not model.artifact_location or not os.path.exists(model.artifact_location):
         raise HTTPException(
@@ -1515,6 +1570,9 @@ def get_remote_model_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Check local availability
     can_predict_locally = bool(
@@ -1577,6 +1635,9 @@ def predict_remote(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Get experiment_id
     experiment_id = str(model.experiment_id) if model.experiment_id else None
@@ -1678,6 +1739,9 @@ def predict_auto(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",
         )
+    project = db.query(Project).filter(Project.id == model.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this model")
 
     # Check if local prediction is available
     can_predict_locally = bool(

@@ -10,6 +10,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models import (
     Project,
     Experiment,
@@ -56,12 +57,17 @@ def get_project_or_404(
     db: Session,
     current_user: Optional[User] = None,
 ) -> Project:
-    """Get project by ID or raise 404."""
+    """Get project by ID or raise 404, and verify user access."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
+        )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
     return project
 
@@ -279,6 +285,14 @@ def get_research_cycle(
     """Get a research cycle with all its linked experiments and notebook entries."""
     cycle = get_cycle_or_404(cycle_id, db)
 
+    # Verify user has access to the cycle's project
+    project = db.query(Project).filter(Project.id == cycle.project_id).first()
+    if project and not check_project_access(db, project, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
+
     # Get linked experiments with their details
     cycle_exps = db.query(CycleExperiment).filter(
         CycleExperiment.research_cycle_id == cycle_id
@@ -348,6 +362,14 @@ def update_research_cycle(
     """Update a research cycle (title, status)."""
     cycle = get_cycle_or_404(cycle_id, db)
 
+    # Verify user has write access to the cycle's project
+    project = db.query(Project).filter(Project.id == cycle.project_id).first()
+    if project and not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
+
     if data.summary_title is not None:
         cycle.summary_title = data.summary_title
     if data.status is not None:
@@ -380,6 +402,14 @@ def link_experiment(
 ):
     """Link an experiment to a research cycle."""
     cycle = get_cycle_or_404(cycle_id, db)
+
+    # Verify user has write access to the cycle's project
+    project = db.query(Project).filter(Project.id == cycle.project_id).first()
+    if project and not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
     # Verify experiment exists and belongs to same project
     experiment = db.query(Experiment).filter(Experiment.id == data.experiment_id).first()
@@ -509,6 +539,14 @@ def get_notebook_entry(
             detail=f"Lab notebook entry {entry_id} not found",
         )
 
+    # Verify user has access to the entry's project
+    project = db.query(Project).filter(Project.id == entry.project_id).first()
+    if project and not check_project_access(db, project, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
+
     return LabNotebookEntryResponse(
         id=entry.id,
         project_id=entry.project_id,
@@ -535,6 +573,14 @@ def update_notebook_entry(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Lab notebook entry {entry_id} not found",
+        )
+
+    # Verify user has write access to the entry's project
+    project = db.query(Project).filter(Project.id == entry.project_id).first()
+    if project and not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
 
     if data.title is not None:
@@ -570,6 +616,14 @@ def delete_notebook_entry(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Lab notebook entry {entry_id} not found",
+        )
+
+    # Verify user has write access to the entry's project
+    project = db.query(Project).filter(Project.id == entry.project_id).first()
+    if project and not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
 
     db.delete(entry)

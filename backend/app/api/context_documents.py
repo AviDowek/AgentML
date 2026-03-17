@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.user import User
 from app.models.project import Project
 from app.models.context_document import ContextDocument
@@ -85,6 +86,8 @@ async def upload_context_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     # Validate file has a name
     if not file.filename:
@@ -144,6 +147,8 @@ async def list_context_documents(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     query = db.query(ContextDocument).filter(ContextDocument.project_id == project_id)
 
@@ -190,6 +195,9 @@ async def get_context_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Context document {document_id} not found",
         )
+    project = db.query(Project).filter(Project.id == context_doc.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     # Use custom method to include preview
     return ContextDocumentDetailResponse.from_orm_with_preview(
@@ -221,6 +229,9 @@ async def update_context_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Context document {document_id} not found",
         )
+    project = db.query(Project).filter(Project.id == context_doc.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     update_data = update.model_dump(exclude_unset=True)
 
@@ -253,6 +264,9 @@ async def delete_context_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Context document {document_id} not found",
         )
+    project = db.query(Project).filter(Project.id == context_doc.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     try:
         handler = ContextDocumentHandler(db)
@@ -288,6 +302,9 @@ async def reextract_text(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Context document {document_id} not found",
         )
+    project = db.query(Project).filter(Project.id == context_doc.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     try:
         handler = ContextDocumentHandler(db)
@@ -324,6 +341,9 @@ async def toggle_document_active(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Context document {document_id} not found",
         )
+    project = db.query(Project).filter(Project.id == context_doc.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     context_doc.is_active = not context_doc.is_active
     db.commit()

@@ -24,7 +24,7 @@ from app.services.file_handlers import read_file, get_handler
 from app.services.data_profiler import profile_data_source, profile_all_data_sources
 from app.core.security import get_current_user
 from app.models.user import User
-from app.api.dependencies import get_project_with_access, get_project_with_write_access
+from app.api.dependencies import check_project_access, get_project_with_access, get_project_with_write_access
 
 
 class DataPreviewResponse(BaseModel):
@@ -87,6 +87,8 @@ async def upload_data_source(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have write access to this project")
 
     # Validate file has a name
     if not file.filename:
@@ -221,6 +223,8 @@ def create_data_source(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have write access to this project")
 
     db_data_source = DataSource(
         project_id=project_id,
@@ -249,6 +253,8 @@ def list_data_sources(project_id: UUID, db: Session = Depends(get_db), current_u
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     return db.query(DataSource).filter(DataSource.project_id == project_id).all()
 
@@ -267,6 +273,9 @@ def get_data_source(data_source_id: UUID, db: Session = Depends(get_db), current
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Data source {data_source_id} not found",
         )
+    project = db.query(Project).filter(Project.id == data_source.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this data source")
     return data_source
 
 
@@ -289,6 +298,9 @@ def update_data_source(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Data source {data_source_id} not found",
         )
+    project = db.query(Project).filter(Project.id == data_source.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have write access to this data source")
 
     update_data = data_source_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -310,6 +322,9 @@ def delete_data_source(data_source_id: UUID, db: Session = Depends(get_db), curr
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Data source {data_source_id} not found",
         )
+    project = db.query(Project).filter(Project.id == data_source.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have write access to this data source")
 
     db.delete(data_source)
     db.commit()
@@ -345,6 +360,9 @@ def get_data_source_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Data source {data_source_id} not found",
         )
+    project = db.query(Project).filter(Project.id == data_source.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this data source")
 
     # Get file path from config
     config = data_source.config_json or {}
@@ -493,6 +511,8 @@ def profile_all_project_data_sources(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     try:
         result = profile_all_data_sources(db, project_id, sample_rows=sample_rows)
@@ -553,6 +573,9 @@ def profile_single_data_source(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Data source {data_source_id} not found",
         )
+    project = db.query(Project).filter(Project.id == data_source.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this data source")
 
     try:
         profile = profile_data_source(db, data_source_id, sample_rows=sample_rows)

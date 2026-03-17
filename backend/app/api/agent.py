@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.api_key import LLMProvider
 from app.models.project import Project, TaskType
 from app.models.data_source import DataSource
@@ -883,6 +884,15 @@ def get_agent_run(
             detail=f"Agent run {run_id} not found",
         )
 
+    # Verify user has access to the run's project
+    if agent_run.project_id:
+        project = db.query(Project).filter(Project.id == agent_run.project_id).first()
+        if project and not check_project_access(db, project, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     return AgentRunWithSteps.model_validate(agent_run)
 
 
@@ -906,6 +916,15 @@ def delete_agent_run(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent run {run_id} not found",
         )
+
+    # Verify user has write access to the run's project
+    if agent_run.project_id:
+        project = db.query(Project).filter(Project.id == agent_run.project_id).first()
+        if project and not check_project_access(db, project, current_user, require_write=True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
 
     # Don't allow deleting running pipelines
     if agent_run.status == AgentRunStatus.RUNNING:
@@ -974,6 +993,15 @@ def cancel_agent_run(
             detail=f"Agent run {run_id} not found",
         )
 
+    # Verify user has write access to the run's project
+    if agent_run.project_id:
+        project = db.query(Project).filter(Project.id == agent_run.project_id).first()
+        if project and not check_project_access(db, project, current_user, require_write=True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     # Only allow cancelling running pipelines
     if agent_run.status != AgentRunStatus.RUNNING:
         raise HTTPException(
@@ -1014,6 +1042,16 @@ def get_agent_step(
             detail=f"Agent step {step_id} not found",
         )
 
+    # Verify user has access to the step's project (via its run)
+    agent_run = db.query(AgentRun).filter(AgentRun.id == step.agent_run_id).first()
+    if agent_run and agent_run.project_id:
+        project = db.query(Project).filter(Project.id == agent_run.project_id).first()
+        if project and not check_project_access(db, project, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     return AgentStepRead.model_validate(step)
 
 
@@ -1042,6 +1080,16 @@ def get_step_logs(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent step {step_id} not found",
         )
+
+    # Verify user has access to the step's project (via its run)
+    agent_run = db.query(AgentRun).filter(AgentRun.id == step.agent_run_id).first()
+    if agent_run and agent_run.project_id:
+        project = db.query(Project).filter(Project.id == agent_run.project_id).first()
+        if project and not check_project_access(db, project, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
 
     # Query logs with sequence > since_sequence
     logs = (
@@ -2520,6 +2568,15 @@ async def run_results_pipeline(
             detail=f"Experiment {experiment_id} not found",
         )
 
+    # Verify user has write access to the experiment's project
+    if experiment.project_id:
+        project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if project and not check_project_access(db, project, current_user, require_write=True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     # Verify experiment is completed
     if experiment.status != "completed":
         raise HTTPException(
@@ -2592,6 +2649,15 @@ def list_experiment_agent_runs(
             detail=f"Experiment {experiment_id} not found",
         )
 
+    # Verify user has access to the experiment's project
+    if experiment.project_id:
+        project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if project and not check_project_access(db, project, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     # Query agent runs for this experiment
     query = db.query(AgentRun).filter(AgentRun.experiment_id == experiment_id)
     total = query.count()
@@ -2625,6 +2691,15 @@ def get_experiment_agent_run(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+
+    # Verify user has access to the experiment's project
+    if experiment.project_id:
+        project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if project and not check_project_access(db, project, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
 
     agent_run = get_agent_run_with_steps(db, run_id, include_logs=include_logs)
     if not agent_run:
@@ -3036,12 +3111,17 @@ async def run_data_architect(
     Returns:
         agent_run_id: UUID of the created agent run
     """
-    # Verify project exists
+    # Verify project exists and user has access
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
+        )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
 
     # Verify project has data sources

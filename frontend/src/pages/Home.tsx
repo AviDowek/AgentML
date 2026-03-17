@@ -1,90 +1,77 @@
-import { useState, useEffect } from 'react';
-
-interface HealthStatus {
-  status: string;
-}
-
-interface ApiInfo {
-  name: string;
-  version: string;
-  docs: string;
-}
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
-  const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [apiInfo, setApiInfo] = useState<ApiInfo | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, user } = useAuth();
 
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const [healthRes, infoRes] = await Promise.all([
-          fetch('http://localhost:8001/health'),
-          fetch('http://localhost:8001/')
-        ]);
+  if (isAuthenticated) {
+    return (
+      <div className="home-page">
+        <section className="hero">
+          <h2>Welcome back, {user?.full_name || user?.email}!</h2>
+          <p>
+            Build, train, and deploy machine learning models for tabular data.
+          </p>
+        </section>
 
-        if (healthRes.ok) {
-          setHealth(await healthRes.json());
-        }
-        if (infoRes.ok) {
-          setApiInfo(await infoRes.json());
-        }
-      } catch {
-        setError('Backend not available. Make sure the API is running on port 8001.');
-      }
-    };
-
-    checkBackend();
-  }, []);
+        <section className="features">
+          <h3>Quick Start</h3>
+          <div className="feature-grid">
+            <Link to="/projects" className="feature-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h4>Projects</h4>
+              <p>Manage your ML projects and data</p>
+            </Link>
+            <Link to="/experiments" className="feature-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h4>Experiments</h4>
+              <p>View and run experiments</p>
+            </Link>
+            <Link to="/models" className="feature-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h4>Models</h4>
+              <p>Compare and deploy models</p>
+            </Link>
+            <Link to="/auto-ds" className="feature-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <h4>Auto DS</h4>
+              <p>Automated data science sessions</p>
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="home-page">
       <section className="hero">
-        <h2>Welcome to Agentic ML Platform</h2>
+        <h2>AgentML</h2>
         <p>
           An intelligent ML engineering platform that helps you build, train,
-          and deploy machine learning models for tabular data problems.
+          and deploy machine learning models for tabular data. Describe your
+          prediction task in natural language and let AI agents do the rest.
         </p>
-      </section>
-
-      <section className="status-section">
-        <h3>System Status</h3>
-        {error ? (
-          <div className="status-card error">
-            <span className="status-indicator">⚠️</span>
-            <span>{error}</span>
-          </div>
-        ) : health ? (
-          <div className="status-card success">
-            <span className="status-indicator">✓</span>
-            <span>Backend: {health.status}</span>
-            {apiInfo && <span> | Version: {apiInfo.version}</span>}
-          </div>
-        ) : (
-          <div className="status-card loading">
-            <span>Checking backend status...</span>
-          </div>
-        )}
+        <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <Link to="/signup" className="btn btn-primary">Get Started</Link>
+          <Link to="/login" className="btn btn-text">Sign In</Link>
+        </div>
       </section>
 
       <section className="features">
         <h3>Key Features</h3>
         <div className="feature-grid">
           <div className="feature-card">
-            <h4>📝 Natural Language Tasks</h4>
+            <h4>Natural Language Tasks</h4>
             <p>Describe your ML problem in plain English</p>
           </div>
           <div className="feature-card">
-            <h4>🔗 Data Connections</h4>
-            <p>Connect databases or upload files</p>
+            <h4>Multi-Table Data</h4>
+            <p>Connect databases or upload files, auto-join multiple tables</p>
           </div>
           <div className="feature-card">
-            <h4>🧪 Automated Experiments</h4>
-            <p>Run multiple experiment variants automatically</p>
+            <h4>Automated Experiments</h4>
+            <p>AI agents design, run, and iterate on experiments</p>
           </div>
           <div className="feature-card">
-            <h4>🏆 Model Leaderboard</h4>
-            <p>Compare and select the best models</p>
+            <h4>Model Lifecycle</h4>
+            <p>Promote models from draft to production with guardrails</p>
           </div>
         </div>
       </section>

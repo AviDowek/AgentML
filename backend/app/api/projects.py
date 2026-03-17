@@ -81,11 +81,16 @@ def create_project(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new project."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to create a project",
+        )
     db_project = Project(
         name=project.name,
         description=project.description,
         task_type=project.task_type,
-        owner_id=current_user.id if current_user else None,
+        owner_id=current_user.id,
     )
     db.add(db_project)
     db.commit()
@@ -175,7 +180,12 @@ def delete_project(
         )
 
     # Only owner can delete
-    if current_user and project.owner_id and project.owner_id != current_user.id:
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    if project.owner_id and project.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the project owner can delete this project",

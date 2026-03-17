@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.api_key import LLMProvider
 from app.models.data_source import DataSource
 from app.models.project import Project
@@ -256,6 +257,13 @@ async def generate_visualization(
     If the generated code fails to execute, the error is fed back to the LLM
     to retry with corrections (up to 3 attempts).
     """
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     # Get file path
     file_path = get_data_source_file_path(db, project_id, request.data_source_id)
 
@@ -351,6 +359,11 @@ async def execute_code(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
     # Execute the code
     result = execute_visualization_code(request.code)
@@ -372,6 +385,13 @@ async def explain_viz(
 
     Helps users understand charts and their implications.
     """
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     # Get file path
     file_path = get_data_source_file_path(db, project_id, request.data_source_id)
 
@@ -424,6 +444,11 @@ async def get_suggestions(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
+        )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
 
     # Get file path
@@ -502,6 +527,13 @@ async def get_data_summary(
 
     Returns column information, types, statistics for visualization planning.
     """
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     # Get file path
     file_path = get_data_source_file_path(db, project_id, data_source_id)
 
@@ -578,6 +610,11 @@ async def save_visualization(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
     user_id = current_user.id if current_user else None
 
@@ -615,6 +652,11 @@ async def list_saved_visualizations(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
     user_id = current_user.id if current_user else None
 
@@ -633,6 +675,13 @@ async def get_saved_visualization(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Get a saved visualization by ID."""
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     user_id = current_user.id if current_user else None
 
     query = db.query(Visualization).filter(
@@ -660,6 +709,13 @@ async def update_saved_visualization(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Update a saved visualization."""
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     user_id = current_user.id if current_user else None
 
     query = db.query(Visualization).filter(
@@ -693,6 +749,13 @@ async def delete_saved_visualization(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Delete a saved visualization."""
+    # Verify project access
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     user_id = current_user.id if current_user else None
 
     query = db.query(Visualization).filter(
@@ -831,6 +894,11 @@ async def generate_dataset_spec_visualization(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
+        )
 
     # Get dataset spec
     dataset_spec = db.query(DatasetSpec).filter(
@@ -954,6 +1022,11 @@ async def get_dataset_spec_suggestions(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
+        )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this project",
         )
 
     # Get dataset spec

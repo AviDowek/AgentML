@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.user import User
 from app.models.project import Project
 from app.models.auto_ds_session import (
@@ -69,6 +70,8 @@ def create_auto_ds_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     orchestrator = AutoDSOrchestrator(db)
     session = orchestrator.create_session(
@@ -110,6 +113,8 @@ def list_auto_ds_sessions(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     query = db.query(AutoDSSession).filter(AutoDSSession.project_id == project_id)
 
@@ -138,6 +143,12 @@ def get_auto_ds_session(
     """Get details of an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -166,6 +177,12 @@ def update_auto_ds_session(
     """Update an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -210,6 +227,12 @@ def start_auto_ds_session(
     """Start an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -262,6 +285,12 @@ def pause_auto_ds_session(
     """Pause a running Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -299,6 +328,12 @@ def stop_auto_ds_session(
     """Stop an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -336,6 +371,12 @@ def get_auto_ds_session_progress(
     """Get detailed progress of an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -404,6 +445,12 @@ def delete_auto_ds_session(
     """Delete an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -443,6 +490,12 @@ def list_session_iterations(
     """List iterations for an Auto DS session with experiments."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -541,6 +594,12 @@ def get_session_iteration(
     """Get details of a specific iteration."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     iteration = db.query(AutoDSIteration).filter(
         AutoDSIteration.id == iteration_id,
         AutoDSIteration.session_id == session_id,
@@ -582,6 +641,12 @@ def list_session_insights(
     """List research insights from an Auto DS session."""
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Project {project_id} not found")
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
+
     session = db.query(AutoDSSession).filter(
         AutoDSSession.id == session_id,
         AutoDSSession.project_id == project_id,
@@ -623,6 +688,8 @@ def list_project_insights(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     query = db.query(ResearchInsight).filter(ResearchInsight.project_id == project_id)
     total = query.count()

@@ -63,11 +63,15 @@ export default function MainLayout() {
           </Link>
           <ul className="nav-links">
             <li><Link to="/">Home</Link></li>
-            <li><Link to="/projects">Projects</Link></li>
-            <li><Link to="/experiments">Experiments</Link></li>
-            <li><Link to="/models">Models</Link></li>
-            <li><Link to="/auto-ds">Auto DS</Link></li>
-            <li><Link to="/settings">Settings</Link></li>
+            {isAuthenticated && (
+              <>
+                <li><Link to="/projects">Projects</Link></li>
+                <li><Link to="/experiments">Experiments</Link></li>
+                <li><Link to="/models">Models</Link></li>
+                <li><Link to="/auto-ds">Auto DS</Link></li>
+                <li><Link to="/settings">Settings</Link></li>
+              </>
+            )}
           </ul>
           <div className="model-selector-container">
             <button

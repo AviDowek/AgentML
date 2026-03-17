@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.api_key import LLMProvider
+from app.models.project import Project
 from app.models.user import User
 from app.models.conversation import Conversation, ConversationMessage
 from app.services import api_key_service
@@ -26,6 +28,22 @@ from app.schemas.conversation import (
 )
 
 router = APIRouter(prefix="/api/v1/chat", tags=["Chat"])
+
+
+def _check_conversation_project_access(
+    db: Session,
+    conversation: Conversation,
+    current_user: Optional[User],
+    require_write: bool = False,
+) -> None:
+    """If conversation is tied to a project, verify user has project access."""
+    if conversation.context_type == "project" and conversation.context_id:
+        project = db.query(Project).filter(Project.id == conversation.context_id).first()
+        if project and not check_project_access(db, project, current_user, require_write=require_write):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
 
 
 class ChatMessage(BaseModel):
@@ -254,6 +272,15 @@ def create_conversation(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Create a new conversation."""
+    # If conversation is tied to a project, verify access
+    if data.context_type == "project" and data.context_id:
+        project = db.query(Project).filter(Project.id == data.context_id).first()
+        if project and not check_project_access(db, project, current_user, require_write=True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this project",
+            )
+
     conversation = Conversation(
         title=data.title,
         context_type=data.context_type,
@@ -298,6 +325,9 @@ def get_conversation(
             detail="You don't have access to this conversation",
         )
 
+    # Check project access if conversation is tied to a project
+    _check_conversation_project_access(db, conversation, current_user)
+
     return ConversationResponse(
         id=conversation.id,
         title=conversation.title,
@@ -340,6 +370,9 @@ def update_conversation(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this conversation",
         )
+
+    # Check project access if conversation is tied to a project
+    _check_conversation_project_access(db, conversation, current_user, require_write=True)
 
     if data.title is not None:
         conversation.title = data.title
@@ -389,6 +422,9 @@ def delete_conversation(
             detail="You don't have permission to delete this conversation",
         )
 
+    # Check project access if conversation is tied to a project
+    _check_conversation_project_access(db, conversation, current_user, require_write=True)
+
     db.delete(conversation)
     db.commit()
 
@@ -416,6 +452,9 @@ async def send_message(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this conversation",
         )
+
+    # Check project access if conversation is tied to a project
+    _check_conversation_project_access(db, conversation, current_user, require_write=True)
 
     # Get provider and key
     provider, api_key_str = get_llm_provider_and_key(db)

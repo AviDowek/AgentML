@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.user import User
 from app.models.project import Project
 from app.models.dataset_spec import DatasetSpec
@@ -93,6 +94,8 @@ def create_dataset_spec(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     db_dataset_spec = DatasetSpec(
         project_id=project_id,
@@ -131,6 +134,8 @@ def list_dataset_specs(project_id: UUID, db: Session = Depends(get_db), current_
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     return db.query(DatasetSpec).filter(DatasetSpec.project_id == project_id).all()
 
@@ -149,6 +154,9 @@ def get_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db), curre
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
     return dataset_spec
 
 
@@ -171,6 +179,9 @@ def update_dataset_spec(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     update_data = dataset_spec_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -192,6 +203,9 @@ def delete_dataset_spec(dataset_spec_id: UUID, db: Session = Depends(get_db), cu
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     db.delete(dataset_spec)
     db.commit()
@@ -222,6 +236,9 @@ def get_dataset_spec_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     try:
         # Build the dataset from sources
@@ -329,6 +346,9 @@ def get_dataset_experiments(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     # Get all experiments using this dataset spec
     experiments_query = db.query(Experiment).filter(
@@ -460,6 +480,9 @@ def download_dataset_spec(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset spec {dataset_spec_id} not found",
         )
+    project = db.query(Project).filter(Project.id == dataset_spec.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this resource")
 
     try:
         # Build the dataset from sources

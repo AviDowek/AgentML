@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.api.dependencies import check_project_access
 from app.models.user import User
 from app.models.project import Project
 from app.models.experiment import Experiment, Trial, ExperimentStatus
@@ -99,6 +100,8 @@ def create_experiment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     db_experiment = Experiment(
         project_id=project_id,
@@ -130,6 +133,8 @@ def list_experiments(project_id: UUID, db: Session = Depends(get_db), current_us
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     return db.query(Experiment).filter(Experiment.project_id == project_id).all()
 
@@ -148,6 +153,9 @@ def get_experiment(experiment_id: UUID, db: Session = Depends(get_db), current_u
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Get trials for this experiment
     trials = db.query(Trial).filter(Trial.experiment_id == experiment_id).all()
@@ -308,6 +316,9 @@ def update_experiment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     update_data = experiment_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -332,6 +343,9 @@ def delete_experiment(experiment_id: UUID, db: Session = Depends(get_db), curren
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # If experiment has a task, revoke it before deleting
     if experiment.celery_task_id and experiment.status in [
@@ -379,6 +393,13 @@ def bulk_delete_experiments(
             if not experiment:
                 failed_ids.append(str(exp_id))
                 errors.append(f"Experiment {exp_id} not found")
+                continue
+
+            # Check project access
+            exp_project = db.query(Project).filter(Project.id == experiment.project_id).first()
+            if not check_project_access(db, exp_project, current_user, require_write=True):
+                failed_ids.append(str(exp_id))
+                errors.append(f"You don't have access to experiment {exp_id}")
                 continue
 
             # Skip running experiments
@@ -441,6 +462,9 @@ def update_auto_iterate_settings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Update settings
     experiment.auto_iterate_enabled = 1 if request.enabled else 0
@@ -481,6 +505,9 @@ def get_auto_iterate_settings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     can_continue = experiment.iteration_number < experiment.auto_iterate_max
 
@@ -718,6 +745,9 @@ async def apply_fix(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Get linked dataset spec
     dataset_spec = None
@@ -809,6 +839,9 @@ def run_experiment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Check if experiment is in a runnable state
     if experiment.status not in [ExperimentStatus.PENDING, ExperimentStatus.FAILED]:
@@ -984,6 +1017,9 @@ def cancel_experiment(experiment_id: UUID, db: Session = Depends(get_db), curren
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     if experiment.status not in [ExperimentStatus.PENDING, ExperimentStatus.RUNNING]:
         raise HTTPException(
@@ -1083,6 +1119,17 @@ def run_experiments_batch(
             failed_count += 1
             continue
 
+        # Check project access
+        exp_project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if not check_project_access(db, exp_project, current_user, require_write=True):
+            results.append(BatchExperimentStatus(
+                experiment_id=experiment_id,
+                status="error",
+                message="You don't have access to this experiment",
+            ))
+            failed_count += 1
+            continue
+
         # Check if experiment is in a runnable state
         if experiment.status not in [ExperimentStatus.PENDING, ExperimentStatus.FAILED]:
             results.append(BatchExperimentStatus(
@@ -1153,6 +1200,9 @@ def get_experiment_progress(experiment_id: UUID, db: Session = Depends(get_db), 
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Default response for non-running states
     if experiment.status == ExperimentStatus.PENDING:
@@ -1243,6 +1293,9 @@ def create_trial(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     db_trial = Trial(
         experiment_id=experiment_id,
@@ -1271,6 +1324,9 @@ def list_trials(experiment_id: UUID, db: Session = Depends(get_db), current_user
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     return db.query(Trial).filter(Trial.experiment_id == experiment_id).all()
 
@@ -1289,6 +1345,11 @@ def get_trial(trial_id: UUID, db: Session = Depends(get_db), current_user: Optio
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Trial {trial_id} not found",
         )
+    experiment = db.query(Experiment).filter(Experiment.id == trial.experiment_id).first()
+    if experiment:
+        project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if not check_project_access(db, project, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this trial")
     return trial
 
 
@@ -1322,6 +1383,9 @@ async def generate_training_critique(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     if experiment.status != ExperimentStatus.COMPLETED:
         raise HTTPException(
@@ -1484,6 +1548,9 @@ def get_training_critique(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Get the latest trial with critique
     trial = (
@@ -1586,6 +1653,9 @@ async def trigger_improvement(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user, require_write=True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Validate experiment is completed
     if experiment.status != ExperimentStatus.COMPLETED:
@@ -1646,6 +1716,9 @@ def get_experiment_iterations(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Find the root experiment (no parent)
     root = experiment
@@ -1825,6 +1898,9 @@ def get_improvement_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Find the latest improvement agent run for this experiment
     agent_run = (
@@ -1899,6 +1975,9 @@ def get_overfitting_analysis(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Get overfitting report
     report = get_overfitting_report(db, experiment)
@@ -1937,6 +2016,8 @@ def get_iterations_overfitting(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project {project_id} not found",
         )
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this project")
 
     # Get experiment
     experiment = db.query(Experiment).filter(
@@ -2023,6 +2104,9 @@ def get_experiment_visualization(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Experiment {experiment_id} not found",
             )
+        project = db.query(Project).filter(Project.id == experiment.project_id).first()
+        if not check_project_access(db, project, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
         if experiment.status != ExperimentStatus.COMPLETED:
             return {
@@ -2641,6 +2725,9 @@ def get_experiment_notebook(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+    project = db.query(Project).filter(Project.id == experiment.project_id).first()
+    if not check_project_access(db, project, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this experiment")
 
     # Generate notebook
     notebook_json = generate_experiment_notebook(str(experiment_id), db)
