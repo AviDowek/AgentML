@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional, Type
 from pydantic import BaseModel
 
 from app.models.api_key import LLMProvider
+from app.services.encryption import decrypt
 
 logger = logging.getLogger(__name__)
 
@@ -1031,6 +1032,9 @@ def get_llm_client(
     finally:
         db.close()
 
+    # Always decrypt the API key (handles both DB-fetched and caller-provided encrypted keys)
+    api_key = decrypt(api_key)
+
     if provider == LLMProvider.OPENAI:
         # Check if using O3 Deep Research model
         if selected_model and selected_model.startswith("o3-deep-research"):
@@ -1079,6 +1083,9 @@ def create_critique_client(debate_partner_model: str) -> Optional[BaseLLMClient]
             return None
 
         api_key = api_key_record.api_key
+
+        # Always decrypt
+        api_key = decrypt(api_key)
 
         # Create the appropriate client
         if provider == LLMProvider.GEMINI:

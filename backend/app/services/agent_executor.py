@@ -5865,7 +5865,7 @@ async def run_agent_step(
     try:
         # Get or create LLM client
         if llm_client is None:
-            llm_client = get_llm_client(db)
+            llm_client = get_llm_client()
 
         # Get the agent class for this step type from the registry
         if not is_agent_registered(step.step_type):

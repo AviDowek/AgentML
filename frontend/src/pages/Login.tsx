@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiException } from '../services/api';
-import GoogleSignIn from '../components/GoogleSignIn';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -78,17 +77,6 @@ export default function Login() {
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
-
-        <div className="auth-oauth">
-          <GoogleSignIn
-            onError={setError}
-            onSuccess={() => navigate(from, { replace: true })}
-          />
-        </div>
 
         <p className="auth-footer">
           Don't have an account? <Link to="/signup">Sign up</Link>
