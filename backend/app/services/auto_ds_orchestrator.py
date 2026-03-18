@@ -362,23 +362,18 @@ class AutoDSOrchestrator:
         Returns:
             The updated session
         """
-        from app.core.celery_app import celery_app
-
         session = self.db.query(AutoDSSession).filter(AutoDSSession.id == session_id).first()
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # 1. Revoke the main Celery task if it exists
-        # Set stop flag in Redis so running tasks can check and exit gracefully
+        # 1. Revoke the main task if it exists
+        # Set stop flag so running tasks can check and exit gracefully
         set_stop_flag(str(session_id))
         logger.info(f"Set stop flag for session {session_id}")
-        
+
         if session.celery_task_id:
-            try:
-                celery_app.control.revoke(session.celery_task_id, terminate=True)
-                logger.info(f"Revoked Celery task {session.celery_task_id}")
-            except Exception as e:
-                logger.warning(f"Failed to revoke Celery task: {e}")
+            from app.core.task_dispatch import revoke_task
+            revoke_task(session.celery_task_id)
 
         # 2. Cancel all pending/running experiments for this session
         pending_experiments = self.db.query(Experiment).filter(
@@ -394,22 +389,15 @@ class AutoDSOrchestrator:
                 exp.error = f"Cancelled: {reason}"
                 cancelled_count += 1
 
-                # Revoke the experiment's Celery task if it has one
+                # Revoke the experiment's task if it has one
                 if exp.celery_task_id:
-                    try:
-                        celery_app.control.revoke(exp.celery_task_id, terminate=True)
-                    except Exception as e:
-                        logger.warning(f"Failed to revoke experiment task {exp.celery_task_id}: {e}")
+                    from app.core.task_dispatch import revoke_task
+                    revoke_task(exp.celery_task_id)
 
         if cancelled_count > 0:
             logger.info(f"Cancelled {cancelled_count} pending experiments for session {session_id}")
 
-        # 3. Purge the Celery queue to clear any queued tasks
-        try:
-            celery_app.control.purge()
-            logger.info("Purged Celery queue")
-        except Exception as e:
-            logger.warning(f"Failed to purge Celery queue: {e}")
+        # Note: queue purge is not needed for Modal (no persistent queue)
 
         session.status = AutoDSSessionStatus.STOPPED
         session.completed_at = datetime.utcnow()

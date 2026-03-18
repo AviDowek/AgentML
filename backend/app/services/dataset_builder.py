@@ -160,15 +160,11 @@ class DatasetBuilder:
         Raises:
             ValueError: If file not found or invalid configuration
         """
+        from app.services.file_storage import ensure_file_on_disk
+
         config = source.config_json or {}
-        file_path = config.get("file_path")
 
-        if not file_path:
-            raise ValueError(f"DataSource {source.id} has no file_path configured")
-
-        path = Path(file_path)
-        if not path.exists():
-            raise ValueError(f"File not found: {file_path}")
+        path = ensure_file_on_disk(source)
 
         # Determine file type from config or extension
         file_type = config.get("file_type")

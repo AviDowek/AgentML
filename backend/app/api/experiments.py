@@ -3,12 +3,12 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
+from app.core.task_dispatch import TASK_BACKEND
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.api.dependencies import check_project_access
@@ -32,7 +32,7 @@ from app.schemas.experiment import (
     AutoIterateSettingsRequest,
     AutoIterateSettingsResponse,
 )
-from app.tasks import run_automl_experiment_task, run_experiment_modal
+from app.core.task_dispatch import dispatch_task, revoke_task
 
 
 # Error metrics that AutoGluon stores as negative values (higher is better internally)
@@ -352,7 +352,7 @@ def delete_experiment(experiment_id: UUID, db: Session = Depends(get_db), curren
         ExperimentStatus.PENDING,
         ExperimentStatus.RUNNING
     ]:
-        _revoke_celery_task(experiment.celery_task_id)
+        revoke_task(experiment.celery_task_id)
 
     db.delete(experiment)
     db.commit()
@@ -410,7 +410,7 @@ def bulk_delete_experiments(
 
             # Revoke any pending tasks
             if experiment.celery_task_id and experiment.status == ExperimentStatus.PENDING:
-                _revoke_celery_task(experiment.celery_task_id)
+                revoke_task(experiment.celery_task_id)
 
             db.delete(experiment)
             deleted_count += 1
@@ -873,10 +873,10 @@ def run_experiment(
             detail=f"Modal is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in environment variables. Status: {status_info}",
         )
 
-    # Queue the Modal training task via Celery
-    task = run_experiment_modal.delay(str(experiment_id))
+    # Queue the experiment task
+    task = dispatch_task("run_experiment_modal", str(experiment_id))
 
-    # Store the celery task ID for tracking and cancellation
+    # Store the task ID for tracking and cancellation
     experiment.celery_task_id = task.id
     db.commit()
 
@@ -920,10 +920,10 @@ def get_training_options(current_user: Optional[User] = Depends(get_current_user
 
 
 def _revoke_celery_task(task_id: str) -> bool:
-    """Revoke a Celery task and remove it from the queue.
+    """Revoke a task (Celery or Modal).
 
     Args:
-        task_id: The Celery task ID to revoke
+        task_id: The task ID to revoke
 
     Returns:
         True if task was revoked, False otherwise
@@ -932,18 +932,8 @@ def _revoke_celery_task(task_id: str) -> bool:
         return False
 
     try:
-        # Terminate the task forcefully (SIGTERM) if it's running
-        celery_app.control.revoke(
-            task_id,
-            terminate=True,
-            signal="SIGTERM"
-        )
-
-        # Also try to remove from result backend to clean up
-        from celery.result import AsyncResult
-        result = AsyncResult(task_id, app=celery_app)
-        result.forget()
-
+        from app.core.task_dispatch import revoke_task
+        revoke_task(task_id)
         return True
     except Exception:
         # Task may have already completed or not exist
@@ -981,7 +971,8 @@ def cancel_experiment(experiment_id: UUID, db: Session = Depends(get_db), curren
         )
 
     # Revoke the Celery task if it exists
-    task_revoked = _revoke_celery_task(experiment.celery_task_id)
+    task_revoked = True
+    revoke_task(experiment.celery_task_id)
 
     # Update status and clear the task ID
     experiment.status = ExperimentStatus.CANCELLED
@@ -1105,9 +1096,9 @@ def run_experiments_batch(
 
         # Queue the experiment task (always use Modal)
         try:
-            task = run_experiment_modal.delay(str(experiment_id))
+            task = dispatch_task("run_experiment_modal", str(experiment_id))
 
-            # Store the celery task ID for tracking and cancellation
+            # Store the task ID for tracking and cancellation
             experiment.celery_task_id = task.id
 
             results.append(BatchExperimentStatus(
@@ -1191,8 +1182,9 @@ def get_experiment_progress(experiment_id: UUID, db: Session = Depends(get_db), 
         )
 
     # For running experiments, try to get progress from Celery
-    if experiment.celery_task_id:
+    if experiment.celery_task_id and TASK_BACKEND == "celery":
         try:
+            from celery.result import AsyncResult
             result = AsyncResult(experiment.celery_task_id, app=celery_app)
             if result.state == "RUNNING":
                 meta = result.info or {}
@@ -1213,7 +1205,7 @@ def get_experiment_progress(experiment_id: UUID, db: Session = Depends(get_db), 
         except Exception:
             pass
 
-    # Fallback for running without task info
+    # Fallback for running without detailed task info (Modal or no task ID)
     return ExperimentProgressResponse(
         experiment_id=experiment_id,
         status="running",
@@ -1630,7 +1622,7 @@ async def trigger_improvement(
         )
 
     # Queue the auto-improve pipeline
-    task = run_auto_improve_pipeline.delay(str(experiment_id))
+    task = dispatch_task("run_auto_improve_pipeline", str(experiment_id))
 
     return ImproveExperimentResponse(
         experiment_id=experiment_id,

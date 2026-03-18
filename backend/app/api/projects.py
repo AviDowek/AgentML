@@ -21,7 +21,7 @@ from app.schemas.project import (
     ProjectListResponse,
     AutoDSConfig,
 )
-from app.tasks.auto_ds_tasks import run_auto_ds_session
+from app.core.task_dispatch import dispatch_task
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -262,9 +262,9 @@ def start_auto_ds_session(
     project.active_auto_ds_session_id = session.id
     db.commit()
 
-    # Start the Celery task
+    # Start the background task
     dataset_ids = [str(id) for id in dataset_spec_ids] if dataset_spec_ids else None
-    task = run_auto_ds_session.delay(str(session.id), initial_dataset_spec_ids=dataset_ids)
+    task = dispatch_task("run_auto_ds_session", str(session.id), initial_dataset_spec_ids=dataset_ids)
 
     # Update session with task ID
     session.celery_task_id = task.id

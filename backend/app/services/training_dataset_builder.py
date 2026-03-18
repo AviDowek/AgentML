@@ -426,14 +426,10 @@ def _load_data_source(data_source: DataSource, max_rows: Optional[int] = None) -
             f"Only file_upload data sources are supported. Got: {data_source.type}"
         )
 
+    from app.services.file_storage import ensure_file_on_disk
+
     config = data_source.config_json or {}
-    file_path = config.get("file_path")
-
-    if not file_path:
-        raise ValueError(f"Data source {data_source.name} has no file_path in config")
-
-    if not os.path.exists(file_path):
-        raise ValueError(f"File not found: {file_path}")
+    file_path = str(ensure_file_on_disk(data_source))
 
     # Determine file type
     file_type = config.get("file_type", "")

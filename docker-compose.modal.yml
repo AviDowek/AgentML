@@ -1,0 +1,29 @@
+version: '3.8'
+
+# Override for Modal-based deployment (no Redis, no Celery worker needed).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.modal.yml up
+#
+# Or for Railway/production, just set TASK_BACKEND=modal on the backend service.
+
+services:
+  # Remove Redis dependency
+  redis:
+    profiles:
+      - disabled  # Never starts
+
+  # Remove Celery worker
+  celery-worker:
+    profiles:
+      - disabled  # Never starts
+
+  # Backend uses Modal instead of Celery
+  backend:
+    environment:
+      - TASK_BACKEND=modal
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/agentic_ml
+      - MODAL_TOKEN_ID=${MODAL_TOKEN_ID}
+      - MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Remove redis dependency

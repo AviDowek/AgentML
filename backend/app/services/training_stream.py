@@ -13,7 +13,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import AsyncGenerator, Callable
 
-import redis.asyncio as aioredis
+try:
+    import redis.asyncio as aioredis
+    REDIS_AVAILABLE = True
+except ImportError:
+    aioredis = None
+    REDIS_AVAILABLE = False
 
 from app.core.config import get_settings
 
@@ -231,19 +236,26 @@ class TrainingLogPublisher:
         self._redis = None
 
     def _get_sync_redis(self):
-        """Get synchronous Redis client for Celery workers."""
-        import redis
-        settings = get_settings()
-        return redis.from_url(settings.redis_url)
+        """Get synchronous Redis client for workers."""
+        try:
+            import redis
+            settings = get_settings()
+            client = redis.from_url(settings.redis_url)
+            client.ping()
+            return client
+        except Exception:
+            return None
 
     def publish_log(self, raw_log: str):
-        """Publish a log line to Redis (synchronous for Celery)."""
+        """Publish a log line to Redis (synchronous)."""
         try:
             entry = self.interpreter.interpret(raw_log)
 
             # Only publish meaningful entries
             if entry.raw_log.strip():
                 redis_client = self._get_sync_redis()
+                if redis_client is None:
+                    return
                 message = json.dumps(entry.to_dict())
                 redis_client.publish(self.channel, message)
                 redis_client.close()
@@ -267,6 +279,8 @@ class TrainingLogPublisher:
 
         try:
             redis_client = self._get_sync_redis()
+            if redis_client is None:
+                return
             message = json.dumps(entry.to_dict())
             redis_client.publish(self.channel, message)
             redis_client.close()
@@ -287,6 +301,8 @@ class TrainingLogPublisher:
         )
         try:
             redis_client = self._get_sync_redis()
+            if redis_client is None:
+                return
             message = json.dumps(entry.to_dict())
             redis_client.publish(self.channel, message)
             redis_client.close()
@@ -305,10 +321,17 @@ class TrainingLogSubscriber:
 
     async def connect(self):
         """Connect to Redis."""
-        settings = get_settings()
-        self._redis = aioredis.from_url(settings.redis_url)
-        self._pubsub = self._redis.pubsub()
-        await self._pubsub.subscribe(self.channel)
+        if not REDIS_AVAILABLE:
+            return
+        try:
+            settings = get_settings()
+            self._redis = aioredis.from_url(settings.redis_url)
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.subscribe(self.channel)
+        except Exception as e:
+            logger.warning(f"Failed to connect to Redis for log streaming: {e}")
+            self._redis = None
+            self._pubsub = None
 
     async def disconnect(self):
         """Disconnect from Redis."""

@@ -1,9 +1,12 @@
 """Training log service using Redis for storage and retrieval.
 
 This module provides a simple, reliable way to stream training logs:
-1. Celery worker pushes logs to a Redis list
+1. Worker pushes logs to a Redis list (when Redis is available)
 2. Frontend polls an API endpoint to get new logs
 3. Logs are interpreted by AI for non-ML engineers
+
+When Redis is not available (e.g., Modal-only deployment), log storage
+operations gracefully degrade to no-ops and retrieval returns empty lists.
 """
 import asyncio
 import json
@@ -13,7 +16,11 @@ import threading
 from datetime import datetime
 from typing import List, Optional
 
-import redis
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
 
 from app.core.config import get_settings
 
@@ -80,8 +87,15 @@ class AILogInterpreter:
 
     def _get_redis(self):
         if self._redis is None:
-            settings = get_settings()
-            self._redis = redis.from_url(settings.redis_url)
+            if not REDIS_AVAILABLE:
+                return None
+            try:
+                settings = get_settings()
+                self._redis = redis.from_url(settings.redis_url)
+                self._redis.ping()
+            except Exception:
+                self._redis = None
+                return None
         return self._redis
 
     async def interpret_batch(self, logs: List[dict], start_index: int = 0) -> List[dict]:
@@ -251,14 +265,23 @@ class TrainingLogStore:
 
     def _get_redis(self):
         if self._redis is None:
-            settings = get_settings()
-            self._redis = redis.from_url(settings.redis_url)
+            if not REDIS_AVAILABLE:
+                return None
+            try:
+                settings = get_settings()
+                self._redis = redis.from_url(settings.redis_url)
+                self._redis.ping()
+            except Exception:
+                self._redis = None
+                return None
         return self._redis
 
     def add_log(self, message: str, log_type: str = "info", interpreted: str = None):
         """Add a log entry."""
         try:
             r = self._get_redis()
+            if r is None:
+                return
             entry = {
                 "timestamp": datetime.now().isoformat(),
                 "raw_log": message,
@@ -277,6 +300,8 @@ class TrainingLogStore:
             return
         try:
             r = self._get_redis()
+            if r is None:
+                return
             entry = LogInterpreter.interpret(raw_log)
             r.rpush(self.logs_key, json.dumps(entry))
             r.expire(self.logs_key, 3600)
@@ -295,6 +320,8 @@ class TrainingLogStore:
         """
         try:
             r = self._get_redis()
+            if r is None:
+                return [], start_index
             logs = r.lrange(self.logs_key, start_index, -1)
             parsed = [json.loads(log) for log in logs]
             next_index = start_index + len(parsed)
@@ -317,6 +344,8 @@ class TrainingLogStore:
         """
         try:
             r = self._get_redis()
+            if r is None:
+                return
             r.lset(self.logs_key, index, json.dumps(log))
         except Exception as e:
             logger.warning(f"Failed to update log interpretation: {e}")
@@ -325,6 +354,8 @@ class TrainingLogStore:
         """Clear logs for this experiment."""
         try:
             r = self._get_redis()
+            if r is None:
+                return
             r.delete(self.logs_key)
         except Exception as e:
             logger.warning(f"Failed to clear training logs: {e}")

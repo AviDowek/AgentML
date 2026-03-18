@@ -294,8 +294,8 @@ def run_auto_ds_session(
         if not session:
             raise ValueError(f"Session {session_id} not found")
 
-        # Update task ID
-        session.celery_task_id = self.request.id
+        # Update task ID (self.request.id for Celery, passed task_id for Modal)
+        session.celery_task_id = getattr(getattr(self, 'request', None), 'id', None) or "modal-task"
         session.status = AutoDSSessionStatus.RUNNING
         session.started_at = datetime.utcnow()
         db.commit()
@@ -673,14 +673,9 @@ def _run_single_experiment(db, experiment: Experiment) -> None:
     db.commit()
 
     try:
-        print(f"🧪 _run_single_experiment: Calling run_experiment_modal.apply() for {experiment.id}")
-        # Use apply() to run synchronously in the current process
-        # Note: delay().get() is not allowed within a Celery task
-        result = run_experiment_modal.apply(args=[str(experiment.id)])
-
-        # Check if the task succeeded
-        if not result.successful():
-            raise Exception(f"Experiment task failed: {result.result}")
+        print(f"🧪 _run_single_experiment: Calling run_experiment_modal for {experiment.id}")
+        # Call the task function directly (works in both Celery and Modal contexts)
+        result = run_experiment_modal(None, str(experiment.id))  # self=None since task doesn't use it
 
     except Exception as e:
         # IMPORTANT: Refresh experiment from DB first - run_experiment_modal may have

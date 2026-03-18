@@ -141,16 +141,15 @@ def get_data_source_file_path(db: Session, project_id: UUID, data_source_id: UUI
             detail=f"Data source {data_source_id} not found in project {project_id}",
         )
 
-    # Get file path from config
-    config = data_source.config_json or {}
-    file_path = config.get("file_path")
-    if not file_path:
+    # Ensure file exists on disk (restore from DB if needed)
+    from app.services.file_storage import ensure_file_on_disk
+    try:
+        return str(ensure_file_on_disk(data_source))
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data source does not have a file path configured",
+            detail=str(e),
         )
-
-    return file_path
 
 
 def _build_project_context(db: Session, project: Project) -> Dict[str, Any]:
@@ -822,11 +821,9 @@ def _materialize_dataset_spec(db: Session, dataset_spec) -> str:
     if not data_source:
         raise ValueError(f"Data source {data_source_id} not found")
 
-    # Load the data
-    config = data_source.config_json or {}
-    file_path = config.get("file_path")
-    if not file_path:
-        raise ValueError("Data source does not have a file path")
+    # Ensure file exists on disk (restore from DB if needed)
+    from app.services.file_storage import ensure_file_on_disk
+    file_path = str(ensure_file_on_disk(data_source))
 
     # Read the data
     if file_path.endswith('.csv'):

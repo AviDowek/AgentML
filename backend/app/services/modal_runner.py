@@ -217,7 +217,7 @@ def run_experiment_on_modal_sync(
     if str(backend_root) not in sys.path:
         sys.path.insert(0, str(backend_root))
 
-    from modal_training_standalone import app, train_autogluon_remote
+    from modal_worker import app, train_autogluon_remote
 
     # Check dataset size before transfer
     check_dataset_size(dataset, experiment_id)

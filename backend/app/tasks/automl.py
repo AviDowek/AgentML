@@ -190,18 +190,17 @@ def _apply_filters(df: pd.DataFrame, filters: list) -> pd.DataFrame:
 
 def load_from_source(data_source: DataSource) -> pd.DataFrame:
     """Load data from a specific data source."""
-    config = data_source.config_json or {}
+    from app.services.file_storage import ensure_file_on_disk
 
     # Handle file uploads
     if data_source.type.value == "file_upload":
-        file_path = config.get("file_path")
-        if file_path and os.path.exists(file_path):
-            if file_path.endswith(".csv"):
-                return pd.read_csv(file_path)
-            elif file_path.endswith((".xlsx", ".xls")):
-                return pd.read_excel(file_path)
-            elif file_path.endswith(".parquet"):
-                return pd.read_parquet(file_path)
+        file_path = str(ensure_file_on_disk(data_source))
+        if file_path.endswith(".csv"):
+            return pd.read_csv(file_path)
+        elif file_path.endswith((".xlsx", ".xls")):
+            return pd.read_excel(file_path)
+        elif file_path.endswith(".parquet"):
+            return pd.read_parquet(file_path)
 
     raise ValueError(f"Cannot load data from source: {data_source.name}")
 

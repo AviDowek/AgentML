@@ -96,15 +96,12 @@ class DataProfiler:
         Returns:
             Profile dictionary
         """
+        from app.services.file_storage import ensure_file_on_disk
+
         config = data_source.config_json or {}
-        file_path = config.get("file_path")
         warnings = []
 
-        if not file_path:
-            raise ValueError("File source missing file_path in config")
-
-        if not os.path.exists(file_path):
-            raise ValueError(f"File not found: {file_path}")
+        file_path = str(ensure_file_on_disk(data_source))
 
         file_type = config.get("file_type") or get_file_type(file_path)
 
@@ -219,11 +216,13 @@ class DataProfiler:
         schema = data_source.schema_summary or {}
         warnings = []
 
-        # Check if file was downloaded
-        file_path = config.get("file_path")
-        if file_path and os.path.exists(file_path):
-            # Profile the actual file
+        # Check if file exists (or can be restored from DB)
+        try:
+            from app.services.file_storage import ensure_file_on_disk
+            ensure_file_on_disk(data_source)
             return self._profile_file_source(data_source)
+        except ValueError:
+            pass  # File not available — fall through to schema-only profiling
 
         # Use schema summary if available
         if not schema:

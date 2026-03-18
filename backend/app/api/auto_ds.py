@@ -40,7 +40,7 @@ from app.schemas.auto_ds import (
     GlobalInsightListResponse,
 )
 from app.services.auto_ds_orchestrator import AutoDSOrchestrator, get_experiment_all_scores
-from app.tasks.auto_ds_tasks import run_auto_ds_session
+from app.core.task_dispatch import dispatch_task
 
 router = APIRouter(tags=["auto_ds"])
 
@@ -256,9 +256,10 @@ def start_auto_ds_session(
     if request and request.initial_dataset_spec_ids:
         initial_dataset_spec_ids = [str(id) for id in request.initial_dataset_spec_ids]
 
-    # Launch the Celery task to run the session
-    print(f"🚀 API: Queueing Celery task for session {session_id}")
-    task = run_auto_ds_session.delay(
+    # Launch the background task
+    print(f"🚀 API: Queueing task for session {session_id}")
+    task = dispatch_task(
+        "run_auto_ds_session",
         session_id=str(session_id),
         initial_dataset_spec_ids=initial_dataset_spec_ids,
     )

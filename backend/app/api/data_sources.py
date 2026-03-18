@@ -188,13 +188,14 @@ async def upload_data_source(
         config_json["table_index"] = schema_summary.get("analyzed_table_index", 0)
         config_json["table_count"] = schema_summary.get("table_count", 1)
 
-    # Create data source record
+    # Create data source record (store file bytes in DB for persistent storage)
     db_data_source = DataSource(
         project_id=project_id,
         name=source_name,
         type="file_upload",
         config_json=config_json,
         schema_summary=schema_summary,
+        file_data=content,
     )
     db.add(db_data_source)
     db.commit()
@@ -364,21 +365,16 @@ def get_data_source_data(
     if not check_project_access(db, project, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have access to this data source")
 
-    # Get file path from config
-    config = data_source.config_json or {}
-    file_path = config.get("file_path")
-
-    if not file_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data source does not have a file path",
-        )
-
-    if not os.path.exists(file_path):
+    # Ensure file exists on disk (restore from DB if needed)
+    from app.services.file_storage import ensure_file_on_disk
+    try:
+        file_path = str(ensure_file_on_disk(data_source))
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Data file not found on disk",
+            detail=str(e),
         )
+    config = data_source.config_json or {}
 
     # Determine file type and read data using the file handler system
     try:

@@ -1,51 +1,82 @@
-"""Celery application configuration."""
-from celery import Celery
-from kombu import Queue
-from app.core.config import get_settings
+"""Celery application configuration.
 
-settings = get_settings()
+When TASK_BACKEND=modal or Celery is not installed, provides a stub
+that makes @celery_app.task decorators no-ops (functions remain plain callables).
+"""
+import os
+import logging
 
-celery_app = Celery(
-    "agentic_ml",
-    broker=settings.celery_broker_url,
-    backend=settings.celery_result_backend,
-    include=["app.tasks.automl", "app.tasks.experiment_tasks", "app.tasks.auto_ds_tasks"],
-)
+logger = logging.getLogger(__name__)
 
-# Celery configuration
-celery_app.conf.update(
-    # Task settings
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
+TASK_BACKEND = os.environ.get("TASK_BACKEND", "celery")
 
-    # Task tracking
-    task_track_started=True,
-    task_acks_late=True,
 
-    # Result settings
-    result_expires=3600,  # Results expire after 1 hour
+class _CeleryStub:
+    """Stub that mimics celery_app.task() decorator as a no-op."""
 
-    # Worker settings
-    worker_prefetch_multiplier=1,  # Don't prefetch tasks (good for long-running tasks)
-    worker_concurrency=4,  # Allow more concurrent workers for Modal tasks
+    class conf:
+        beat_schedule = {}
 
-    # Task time limits
-    task_soft_time_limit=3600,  # 1 hour soft limit (Modal can take 30+ min)
-    task_time_limit=7200,  # 2 hour hard limit
+        @classmethod
+        def update(cls, **kwargs):
+            pass
 
-    # Retry settings
-    task_default_retry_delay=60,  # 1 minute between retries
-    task_max_retries=3,
+    def task(self, *args, **kwargs):
+        """No-op decorator — returns the function unchanged."""
+        def decorator(func):
+            # Add .delay() and .apply_async() stubs for compatibility
+            func.delay = lambda *a, **kw: func(*a, **kw)
+            func.apply_async = lambda *a, **kw: func(*a, **kw)
+            func.s = lambda *a, **kw: (func, a, kw)
+            return func
+        # Support @celery_app.task (no parens) and @celery_app.task(...) (with parens)
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            return decorator(args[0])
+        return decorator
 
-    # Task queues - 'celery' is the default queue name in Celery
-    task_queues=(
-        Queue('celery', routing_key='celery'),
-    ),
-    task_default_queue='celery',
+    def on_after_configure(self):
+        pass
 
-    # All tasks use the default 'celery' queue
-    task_routes={},
-)
+    class _Signal:
+        def connect(self, func, **kwargs):
+            pass  # Don't schedule periodic tasks without Celery
+
+    on_after_configure = _Signal()
+
+
+if TASK_BACKEND == "modal":
+    logger.info("TASK_BACKEND=modal — using Celery stub (no broker needed)")
+    celery_app = _CeleryStub()
+else:
+    try:
+        from celery import Celery
+        from app.core.config import get_settings
+
+        settings = get_settings()
+
+        celery_app = Celery(
+            "agentic_ml",
+            broker=settings.celery_broker_url,
+            backend=settings.celery_result_backend,
+            include=["app.tasks.automl", "app.tasks.experiment_tasks", "app.tasks.auto_ds_tasks"],
+        )
+
+        celery_app.conf.update(
+            task_serializer="json",
+            accept_content=["json"],
+            result_serializer="json",
+            timezone="UTC",
+            enable_utc=True,
+            task_track_started=True,
+            task_acks_late=True,
+            result_expires=3600,
+            worker_prefetch_multiplier=1,
+            worker_concurrency=4,
+            task_soft_time_limit=3600,
+            task_time_limit=7200,
+            task_default_retry_delay=60,
+            task_max_retries=3,
+        )
+    except Exception as e:
+        logger.warning(f"Celery not available ({e}), using stub")
+        celery_app = _CeleryStub()

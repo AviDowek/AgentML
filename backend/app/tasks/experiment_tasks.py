@@ -42,6 +42,7 @@ from app.core.exceptions import (
     CeleryTaskError,
     ImprovementPipelineError,
 )
+from app.core.task_dispatch import dispatch_task
 
 logger = logging.getLogger(__name__)
 
@@ -889,14 +890,14 @@ def run_experiment(
 
         # Queue critique generation as a follow-up task
         try:
-            generate_training_critique.delay(str(experiment.id), str(trial.id))
+            dispatch_task("generate_training_critique", str(experiment.id), str(trial.id))
             logger.info(f"Queued training critique for experiment {experiment.id}")
         except Exception as critique_error:
             logger.warning(f"Failed to queue training critique: {critique_error}")
 
         # Queue robustness audit as a follow-up task (Prompt 4 requirement)
         try:
-            run_robustness_audit.delay(str(experiment.id))
+            dispatch_task("run_robustness_audit", str(experiment.id))
             logger.info(f"Queued robustness audit for experiment {experiment.id}")
         except Exception as audit_error:
             logger.warning(f"Failed to queue robustness audit: {audit_error}")
@@ -1544,14 +1545,14 @@ def run_experiment_modal(
 
         # Queue critique generation as a follow-up task
         try:
-            generate_training_critique.delay(str(experiment.id), str(trial.id))
+            dispatch_task("generate_training_critique", str(experiment.id), str(trial.id))
             logger.info(f"Queued training critique for Modal experiment {experiment.id}")
         except Exception as critique_error:
             logger.warning(f"Failed to queue training critique: {critique_error}")
 
         # Queue robustness audit as a follow-up task (Prompt 4 requirement)
         try:
-            run_robustness_audit.delay(str(experiment.id))
+            dispatch_task("run_robustness_audit", str(experiment.id))
             logger.info(f"Queued robustness audit for Modal experiment {experiment.id}")
         except Exception as audit_error:
             logger.warning(f"Failed to queue robustness audit: {audit_error}")
@@ -1566,7 +1567,7 @@ def run_experiment_modal(
             logger.info("=" * 60)
             try:
                 # Queue the auto-improve pipeline task
-                run_auto_improve_pipeline.delay(str(experiment.id), use_enhanced_pipeline=True)
+                dispatch_task("run_auto_improve_pipeline", str(experiment.id), use_enhanced_pipeline=True)
                 logger.info(f"Queued auto-improve pipeline for experiment {experiment.id}")
             except Exception as auto_iter_error:
                 logger.warning(f"Failed to queue auto-improve pipeline: {auto_iter_error}")
@@ -2272,7 +2273,7 @@ def run_auto_improve_pipeline(
             logger.info(f"Created new experiment {new_experiment.id} (iteration {new_experiment.iteration_number})")
 
             # Queue for training on Modal
-            task = run_experiment_modal.delay(str(new_experiment.id))
+            task = dispatch_task("run_experiment_modal", str(new_experiment.id))
 
             new_experiment.celery_task_id = task.id
             db.commit()
@@ -2727,7 +2728,7 @@ def run_auto_improve_pipeline(
         logger.info(f"Created new experiment {new_experiment.id} (iteration {new_experiment.iteration_number})")
 
         # Step 5: Queue the new experiment for training on Modal
-        task = run_experiment_modal.delay(str(new_experiment.id))
+        task = dispatch_task("run_experiment_modal", str(new_experiment.id))
 
         new_experiment.celery_task_id = task.id
         db.commit()

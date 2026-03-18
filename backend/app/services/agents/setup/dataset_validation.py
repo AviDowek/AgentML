@@ -86,11 +86,12 @@ class DatasetValidationAgent(BaseAgent):
                 logger.warning("Data source not found")
                 return None
 
-            # Get file path from config_json
-            config = data_source.config_json or {}
-            file_path = config.get("file_path")
-            if not file_path:
-                logger.warning("No file_path in data source config_json")
+            # Ensure file exists on disk (restore from DB if needed)
+            from app.services.file_storage import ensure_file_on_disk
+            try:
+                file_path = str(ensure_file_on_disk(data_source))
+            except ValueError:
+                logger.warning("Could not restore file from DB")
                 return None
 
             # Use file_handlers to support all file types

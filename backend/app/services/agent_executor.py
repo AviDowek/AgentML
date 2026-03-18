@@ -7607,7 +7607,7 @@ def _trigger_auto_ds_if_enabled(db: Session, project_id: UUID) -> None:
 
     If all conditions are met, it creates a new Auto DS session and starts it.
     """
-    from app.tasks.auto_ds_tasks import run_auto_ds_session
+    from app.core.task_dispatch import dispatch_task
 
     # Get the project with fresh data
     project = db.query(Project).filter(Project.id == project_id).first()
@@ -7668,8 +7668,8 @@ def _trigger_auto_ds_if_enabled(db: Session, project_id: UUID) -> None:
     project.active_auto_ds_session_id = session.id
     db.commit()
 
-    # Start the Celery task
-    task = run_auto_ds_session.delay(str(session.id))
+    # Start the background task
+    task = dispatch_task("run_auto_ds_session", str(session.id))
 
     # Update session with task ID
     session.celery_task_id = task.id

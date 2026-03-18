@@ -1,5 +1,5 @@
 """Data source model."""
-from sqlalchemy import Column, String, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, ForeignKey, Enum as SQLEnum, LargeBinary
 from sqlalchemy.orm import relationship
 import uuid
 import enum
@@ -32,6 +32,7 @@ class DataSource(Base, TimestampMixin):
     config_json = Column(JSONType(), nullable=True)  # Connection config (credentials, paths, etc.)
     schema_summary = Column(JSONType(), nullable=True)  # Analyzed schema info
     profile_json = Column(JSONType(), nullable=True)  # Detailed data profile for AI agents
+    file_data = Column(LargeBinary, nullable=True)  # Raw file bytes for persistent storage
 
     # Relationships
     project = relationship("Project", back_populates="data_sources")

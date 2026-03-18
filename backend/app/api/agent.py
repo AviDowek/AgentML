@@ -2018,7 +2018,7 @@ def apply_experiments_batch(
     queue_errors = []
     backend_used = "modal"
     if request.run_immediately:
-        from app.tasks import run_experiment_modal
+        from app.core.task_dispatch import dispatch_task
 
         for exp_info in created_experiments:
             try:
@@ -2026,7 +2026,7 @@ def apply_experiments_batch(
                     Experiment.id == UUID(exp_info["experiment_id"])
                 ).first()
                 if experiment:
-                    task = run_experiment_modal.delay(exp_info["experiment_id"])
+                    task = dispatch_task("run_experiment_modal", exp_info["experiment_id"])
                     experiment.celery_task_id = task.id
                     exp_info["status"] = "queued"
                     exp_info["task_id"] = task.id
@@ -2282,7 +2282,7 @@ def create_experiments_for_dataset(
     # Optionally queue experiments for execution
     queued_count = 0
     if request.run_immediately:
-        from app.tasks import run_experiment_modal
+        from app.core.task_dispatch import dispatch_task
 
         for exp_info in created_experiments:
             try:
@@ -2290,7 +2290,7 @@ def create_experiments_for_dataset(
                     Experiment.id == UUID(exp_info["experiment_id"])
                 ).first()
                 if experiment:
-                    task = run_experiment_modal.delay(exp_info["experiment_id"])
+                    task = dispatch_task("run_experiment_modal", exp_info["experiment_id"])
                     experiment.celery_task_id = task.id
                     exp_info["status"] = "queued"
                     exp_info["task_id"] = task.id
@@ -2481,7 +2481,7 @@ def create_experiments_from_stored_config(
     # Optionally queue experiments
     queued_count = 0
     if request.run_immediately:
-        from app.tasks import run_experiment_modal
+        from app.core.task_dispatch import dispatch_task
 
         for exp_info in created_experiments:
             try:
@@ -2489,7 +2489,7 @@ def create_experiments_from_stored_config(
                     Experiment.id == UUID(exp_info["experiment_id"])
                 ).first()
                 if experiment:
-                    task = run_experiment_modal.delay(exp_info["experiment_id"])
+                    task = dispatch_task("run_experiment_modal", exp_info["experiment_id"])
                     experiment.celery_task_id = task.id
                     exp_info["status"] = "queued"
                     exp_info["task_id"] = task.id

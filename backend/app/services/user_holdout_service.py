@@ -62,16 +62,9 @@ def create_user_holdout_set(
     if not data_source:
         raise ValueError(f"Data source {data_source_id} not found")
 
-    # Load the data from the file
-    config = data_source.config_json or {}
-    file_path = config.get("file_path") or config.get("path")
-
-    if not file_path:
-        raise ValueError("Data source has no file path configured")
-
-    file_path = Path(file_path)
-    if not file_path.exists():
-        raise ValueError(f"Data file not found: {file_path}")
+    # Ensure file exists on disk (restore from DB if needed)
+    from app.services.file_storage import ensure_file_on_disk
+    file_path = ensure_file_on_disk(data_source)
 
     # Read the data using the appropriate handler
     df, metadata = read_file(file_path)

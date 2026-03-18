@@ -26,6 +26,7 @@ class AutoDSSessionStatus(str, enum.Enum):
     PAUSED = "paused"            # User-paused
     COMPLETED = "completed"       # Finished successfully (hit stop condition)
     FAILED = "failed"            # Error occurred
+    STOPPING = "stopping"        # Stop requested, shutting down gracefully
     STOPPED = "stopped"          # User manually stopped
 
 
