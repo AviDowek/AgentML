@@ -281,7 +281,7 @@ export default function AgentPipelineTimeline({
   const [isCreatingExperiment, setIsCreatingExperiment] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [autoRunExperiments, setAutoRunExperiments] = useState(true);  // Toggle for auto-running experiments
+  const autoRunExperiments = false;  // Experiments should not auto-run from pipeline
 
   // Confirmation modal state - now supports multiple variants
   const [showDatasetConfirmation, setShowDatasetConfirmation] = useState(false);
@@ -1306,40 +1306,18 @@ export default function AgentPipelineTimeline({
                     {isCreatingExperiment ? (
                       <>
                         <span className="spinner spinner-small"></span>
-                        {autoRunExperiments ? 'Creating & Running...' : 'Creating Experiments...'}
+                        Creating Experiments...
                       </>
                     ) : (
                       <>
                         <span className="btn-icon">🧪</span>
-                        {autoRunExperiments ? 'Run Experiments for All Datasets' : 'Create Experiments (No Auto-Run)'}
+                        Create Experiments
                       </>
                     )}
                   </button>
                 )}
               </div>
 
-              {/* Auto-run toggle - show when experiment design step exists */}
-              {getExperimentDesignStep() && (
-                <div className="auto-run-toggle">
-                  <label className="toggle-label">
-                    <input
-                      type="checkbox"
-                      checked={autoRunExperiments}
-                      onChange={(e) => setAutoRunExperiments(e.target.checked)}
-                      disabled={isCreatingExperiment}
-                    />
-                    <span className="toggle-switch"></span>
-                    <span className="toggle-text">
-                      Auto-run experiments after creation
-                    </span>
-                  </label>
-                  <span className="toggle-hint">
-                    {autoRunExperiments
-                      ? 'Experiments will start training immediately'
-                      : 'Experiments will be created but not started'}
-                  </span>
-                </div>
-              )}
 
               <p className="pipeline-action-hint">
                 Click "View Details" on any step above to see AI reasoning or create from a specific variant.
