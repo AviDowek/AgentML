@@ -6336,9 +6336,21 @@ async def _run_sequential_pipeline(
                 and not completed_step.output_json.get("is_valid", True)
             ):
                 missing_features = completed_step.output_json.get("missing_features", [])
+                missing_target = completed_step.output_json.get("missing_target")
+                missing_source = completed_step.output_json.get("missing_source_columns", [])
+                errors = completed_step.output_json.get("validation_errors", [])
+                detail_parts = []
+                if missing_target:
+                    detail_parts.append(f"missing target: {missing_target}")
+                if missing_features:
+                    detail_parts.append(f"missing features: {missing_features[:5]}")
+                if missing_source:
+                    detail_parts.append(f"missing source columns: {missing_source[:5]}")
+                if errors and not detail_parts:
+                    detail_parts.append(f"errors: {errors[:3]}")
+                detail = "; ".join(detail_parts) if detail_parts else "unknown validation error"
                 raise ValueError(
-                    f"Dataset Validation failed after {MAX_VALIDATION_RETRIES} retries. "
-                    f"Columns MUST be valid. Missing: {missing_features[:5]}{'...' if len(missing_features) > 5 else ''}"
+                    f"Dataset Validation failed after {MAX_VALIDATION_RETRIES} retries. {detail}"
                 )
 
             # ============================================

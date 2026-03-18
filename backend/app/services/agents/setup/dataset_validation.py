@@ -590,7 +590,8 @@ class DatasetValidationAgent(BaseAgent):
             # Use variant's target_column if specified, otherwise use the default from problem_understanding
             target_column = variant.get("target_column") or default_target_column
             feature_columns = variant.get("feature_columns", [])
-            variant_engineered = variant.get("engineered_features", engineered_features)
+            # Merge variant's engineered features with top-level ones (which may include target_creation)
+            variant_engineered = list(engineered_features) + variant.get("engineered_features", [])
 
             self.logger.thinking(f"Validating variant '{variant_name}': target='{target_column}', {len(feature_columns)} features")
 
