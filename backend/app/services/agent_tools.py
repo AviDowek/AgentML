@@ -413,14 +413,12 @@ class AgentToolExecutor:
         top_n_trials: int = 5
     ) -> Dict[str, Any]:
         """Get experiment results with optional trial details."""
-        query = self.db.query(Experiment).join(ResearchCycle).filter(
-            ResearchCycle.project_id == self.project_id
+        query = self.db.query(Experiment).filter(
+            Experiment.project_id == self.project_id
         )
 
         if experiment_id:
             query = query.filter(Experiment.id == experiment_id)
-        elif cycle_number:
-            query = query.filter(ResearchCycle.sequence_number == cycle_number)
 
         experiments = query.order_by(desc(Experiment.created_at)).limit(20).all()
 
@@ -567,9 +565,8 @@ class AgentToolExecutor:
         # Get failed experiments
         failed_experiments = (
             self.db.query(Experiment)
-            .join(ResearchCycle)
             .filter(
-                ResearchCycle.project_id == self.project_id,
+                Experiment.project_id == self.project_id,
                 Experiment.status == "failed"
             )
             .order_by(desc(Experiment.created_at))
@@ -642,9 +639,8 @@ class AgentToolExecutor:
         query = (
             self.db.query(Trial)
             .join(Experiment)
-            .join(ResearchCycle)
             .filter(
-                ResearchCycle.project_id == self.project_id,
+                Experiment.project_id == self.project_id,
                 Trial.status == "completed"
             )
         )
@@ -743,9 +739,8 @@ class AgentToolExecutor:
         if "experiments" in search_scope:
             experiments = (
                 self.db.query(Experiment)
-                .join(ResearchCycle)
                 .filter(
-                    ResearchCycle.project_id == self.project_id,
+                    Experiment.project_id == self.project_id,
                     Experiment.name.ilike(search_pattern)
                 )
                 .limit(5)
