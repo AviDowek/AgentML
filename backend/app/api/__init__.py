@@ -21,6 +21,7 @@ from app.api.research_cycles import cycles_router as research_cycles_detail_rout
 from app.api.project_history import router as project_history_router
 from app.api.auto_ds import router as auto_ds_router
 from app.api.context_documents import router as context_documents_router
+from app.api.admin import router as admin_router
 
 __all__ = [
     "health_router",
@@ -45,4 +46,5 @@ __all__ = [
     "project_history_router",
     "auto_ds_router",
     "context_documents_router",
+    "admin_router",
 ]

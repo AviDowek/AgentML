@@ -17,6 +17,7 @@ import Guide from './pages/Guide';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AcceptInvite from './pages/AcceptInvite';
+import Admin from './pages/Admin';
 import './App.css';
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
             <Route path="auto-ds/:sessionId" element={<ProtectedRoute><AutoDSDetail /></ProtectedRoute>} />
             <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
+            <Route path="admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           </Route>
         </Routes>
       </BrowserRouter>

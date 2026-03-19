@@ -104,6 +104,18 @@ async def get_current_user_required(
     return user
 
 
+async def get_current_admin(
+    user: User = Depends(get_current_user_required),
+) -> User:
+    """Get the current user and verify they are an admin."""
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
 def generate_invite_token() -> str:
     """Generate a unique token for invitations."""
     import secrets

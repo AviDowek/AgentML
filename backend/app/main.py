@@ -41,6 +41,7 @@ from app.api import (
     project_history_router,
     auto_ds_router,
     context_documents_router,
+    admin_router,
 )
 
 settings = get_settings()
@@ -114,6 +115,7 @@ app.include_router(research_cycles_detail_router)
 app.include_router(project_history_router)
 app.include_router(auto_ds_router)
 app.include_router(context_documents_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

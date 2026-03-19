@@ -649,6 +649,7 @@ export interface User {
   full_name: string | null;
   is_active: boolean;
   is_verified: boolean;
+  is_admin: boolean;
 }
 
 export interface UserCreate {

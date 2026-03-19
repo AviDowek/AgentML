@@ -71,6 +71,7 @@ export default function MainLayout() {
                 <li><Link to="/auto-ds">Auto DS</Link></li>
                 <li><Link to="/settings">Settings</Link></li>
                 <li><Link to="/guide">Guide</Link></li>
+                {user?.is_admin && <li><Link to="/admin" style={{ color: '#f59e0b' }}>Admin</Link></li>}
               </>
             )}
           </ul>

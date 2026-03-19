@@ -2783,3 +2783,76 @@ export async function toggleContextDocumentActive(
     method: 'POST',
   });
 }
+
+
+// ── Admin API ─────────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  is_admin: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  project_count: number;
+  experiment_count: number;
+  last_activity: string | null;
+}
+
+export interface PlatformStats {
+  total_users: number;
+  active_users_7d: number;
+  active_users_30d: number;
+  total_projects: number;
+  total_experiments: number;
+  experiments_by_status: Record<string, number>;
+  total_agent_runs: number;
+  total_auto_ds_sessions: number;
+  new_users_7d: number;
+  new_users_30d: number;
+  experiments_last_7d: number;
+  experiments_last_30d: number;
+}
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  user_email: string | null;
+  action: string;
+  details: string | null;
+  status: string | null;
+  project_name: string | null;
+  experiment_name: string | null;
+}
+
+export interface DailyStat {
+  date: string;
+  count: number;
+}
+
+export async function getAdminStats(): Promise<PlatformStats> {
+  return apiFetch<PlatformStats>('/admin/stats');
+}
+
+export async function getAdminUsers(search?: string): Promise<AdminUser[]> {
+  const params = search ? `?search=${encodeURIComponent(search)}` : '';
+  return apiFetch<AdminUser[]>(`/admin/users${params}`);
+}
+
+export async function getAdminLogs(days: number = 7): Promise<ActivityLog[]> {
+  return apiFetch<ActivityLog[]>(`/admin/logs?days=${days}`);
+}
+
+export async function getAdminAgentRunLogs(days: number = 7): Promise<ActivityLog[]> {
+  return apiFetch<ActivityLog[]>(`/admin/agent-runs?days=${days}`);
+}
+
+export async function getAdminUserTrends(days: number = 30): Promise<DailyStat[]> {
+  return apiFetch<DailyStat[]>(`/admin/trends/users?days=${days}`);
+}
+
+export async function getAdminExperimentTrends(days: number = 30): Promise<DailyStat[]> {
+  return apiFetch<DailyStat[]>(`/admin/trends/experiments?days=${days}`);
+}

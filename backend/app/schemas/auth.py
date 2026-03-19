@@ -20,6 +20,7 @@ class UserResponse(UserBase):
     id: UUID
     is_active: bool
     is_verified: bool
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
