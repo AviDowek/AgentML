@@ -2833,26 +2833,26 @@ export interface DailyStat {
 }
 
 export async function getAdminStats(): Promise<PlatformStats> {
-  return apiFetch<PlatformStats>('/admin/stats');
+  return apiFetch<PlatformStats>('/api/v1/admin/stats');
 }
 
 export async function getAdminUsers(search?: string): Promise<AdminUser[]> {
   const params = search ? `?search=${encodeURIComponent(search)}` : '';
-  return apiFetch<AdminUser[]>(`/admin/users${params}`);
+  return apiFetch<AdminUser[]>(`/api/v1/admin/users${params}`);
 }
 
 export async function getAdminLogs(days: number = 7): Promise<ActivityLog[]> {
-  return apiFetch<ActivityLog[]>(`/admin/logs?days=${days}`);
+  return apiFetch<ActivityLog[]>(`/api/v1/admin/logs?days=${days}`);
 }
 
 export async function getAdminAgentRunLogs(days: number = 7): Promise<ActivityLog[]> {
-  return apiFetch<ActivityLog[]>(`/admin/agent-runs?days=${days}`);
+  return apiFetch<ActivityLog[]>(`/api/v1/admin/agent-runs?days=${days}`);
 }
 
 export async function getAdminUserTrends(days: number = 30): Promise<DailyStat[]> {
-  return apiFetch<DailyStat[]>(`/admin/trends/users?days=${days}`);
+  return apiFetch<DailyStat[]>(`/api/v1/admin/trends/users?days=${days}`);
 }
 
 export async function getAdminExperimentTrends(days: number = 30): Promise<DailyStat[]> {
-  return apiFetch<DailyStat[]>(`/admin/trends/experiments?days=${days}`);
+  return apiFetch<DailyStat[]>(`/api/v1/admin/trends/experiments?days=${days}`);
 }
